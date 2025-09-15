@@ -48,9 +48,17 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 
-//	// AWS SDK v2 - S3 & Presigner
+	// Spring Cloud AWS (AWSpring) S3 starter
+	implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0")
+	implementation "io.awspring.cloud:spring-cloud-aws-starter-s3"
+
+//	// AWS SDK v2 – S3 + core auth
 //	implementation 'software.amazon.awssdk:s3'
+//	implementation 'software.amazon.awssdk:auth'
+//	// (optional) for presigned URLs
+//	// use AssumeRole, activate
 //	implementation 'software.amazon.awssdk:s3-transfer-manager'
+//	implementation 'software.amazon.awssdk:sts'
 }
 
 tasks.named('test') {

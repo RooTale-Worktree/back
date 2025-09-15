@@ -16,15 +16,19 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain security(HttpSecurity http) throws Exception {
         http
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers(
-                                "/", "/error", "/login", "/login/all", "/signup", "/nginx-check",
+                                "/", "/error", "/login", "/login/all", "/s3/**", "/signup", "/nginx-check",
                                 "/css/**", "/js/**", "/images/**", "/assets/**", "/static/**"
                         ).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
-                );
+                )
+                // basic auth off (optional)
+                .httpBasic(httpBasic -> httpBasic.disable())
+                .formLogin(form -> form.disable());
 
         return http.build();
     }
