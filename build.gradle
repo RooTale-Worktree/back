@@ -52,13 +52,8 @@ dependencies {
 	implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0")
 	implementation "io.awspring.cloud:spring-cloud-aws-starter-s3"
 
-//	// AWS SDK v2 – S3 + core auth
-//	implementation 'software.amazon.awssdk:s3'
-//	implementation 'software.amazon.awssdk:auth'
-//	// (optional) for presigned URLs
-//	// use AssumeRole, activate
-//	implementation 'software.amazon.awssdk:s3-transfer-manager'
-//	implementation 'software.amazon.awssdk:sts'
+	//swagger
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
 }
 
 tasks.named('test') {
