@@ -20,29 +20,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers(
-                                "/",
-                                "/error",
+                                "/", "/error",
                                 // Swagger & OpenAPI (springdoc)
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs",
-                                "/v3/api-docs/**",
-                                "/v3/api-docs.yaml",
-                                "/swagger-resources",
-                                "/swagger-resources/**",
-                                "/webjars/**",
+                                "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml",
+                                "/swagger-resources", "/swagger-resources/**", "/webjars/**",
                                 // Auth & public endpoints
-                                "/login",
-                                "/login/all",
-                                "/signup",
-                                "/nginx-check",
-                                "/s3/**",
+                                "/login", "/login/all", "/signup", "/nginx-check", "/s3/**",
                                 // Static assets
-                                "/css/**",
-                                "/js/**",
-                                "/images/**",
-                                "/assets/**",
-                                "/static/**"
+                                "/css/**", "/js/**", "/images/**", "/assets/**", "/static/**"
                         ).permitAll()
                         .requestMatchers("/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
