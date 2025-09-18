@@ -11,7 +11,7 @@ public class S3Config {
     @Bean
     public S3Presigner s3Presigner() {
         return S3Presigner.builder()
-                .region(Region.AP_NORTHEAST_2) // application.yml과 동일한 리전
+                .region(Region.AP_SOUTHEAST_2) // application.yml과 동일한 리전
                 .credentialsProvider(DefaultCredentialsProvider.create())
                 .build();
     }
