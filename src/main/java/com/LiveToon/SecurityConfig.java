@@ -30,8 +30,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/", "/error",
                                 // Swagger & OpenAPI (springdoc)
-                                "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**", "/v3/api-docs.yaml",
-                                "/swagger-resources", "/swagger-resources/**", "/webjars/**",
+                                "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml",
+                                "/swagger-resources/**", "/webjars/**",
                                 // Auth & public endpoints
                                 "/auth/**", "/actuator/health", "/actuator/info",
                                 // "login", "/login/all", "/signup", "/nginx-check", "/s3/**",

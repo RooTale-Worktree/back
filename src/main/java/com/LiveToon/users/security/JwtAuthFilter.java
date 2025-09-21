@@ -23,7 +23,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     // 화이트리스트(필터 건너뛰기)
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
     private static final String[] WHITELIST = {
-            "/auth/**", "/swagger-ui/**", "/v3/api-docs/**"};
+            "/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"};
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
