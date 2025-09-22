@@ -28,13 +28,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getServletPath();
-        // OPTIONS 프리플라이트도 통과
+        // OPTIONS(CORS freeflight), Whitelist path
         if ("OPTIONS".equalsIgnoreCase(request.getMethod())) return true;
         for (String p : WHITELIST) {
-            if (PATH_MATCHER.match(p, path)) {
-                return true;
-            }
-        }
+            if (PATH_MATCHER.match(p, path)) return true;}
         return false;
     }
 

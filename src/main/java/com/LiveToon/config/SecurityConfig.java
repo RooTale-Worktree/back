@@ -1,4 +1,4 @@
-package com.LiveToon;
+package com.LiveToon.config;
 
 import com.LiveToon.users.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
