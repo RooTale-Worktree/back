@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.lang.Nullable;
-import org.openapitools.jackson.nullable.JsonNullable;
+//import org.openapitools.jackson.nullable.JsonNullable;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Schema;
 
