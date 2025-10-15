@@ -1,7 +1,7 @@
 package com.LiveToon.users.security;
 
-import com.LiveToon.repository.UsersRepository;
-import com.LiveToon.users.Users;
+import com.LiveToon.domain.user.entity.User;
+import com.LiveToon.domain.user.repository.UserRepository;
 import com.LiveToon.users.security.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,7 +19,7 @@ public class AuthService {
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
-    private final UsersRepository usersRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     public LoginResponse login(LoginRequest request) {
@@ -44,15 +44,16 @@ public class AuthService {
 
     public void signup(SignupRequest request) {
         // record 접근자: request.username(), request.password(), request.name()
-        usersRepository.findByUsername(request.username())
+        userRepository.findByUsername(request.username())
                 .ifPresent(u -> { throw new IllegalStateException("이미 존재하는 사용자입니다."); });
 
-        Users user = Users.builder()
+        User user = User.builder()
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
                 .name(request.name())
+                .isEnabled(true)
                 .build();
 
-        usersRepository.save(user);
+        userRepository.save(user);
     }
 }

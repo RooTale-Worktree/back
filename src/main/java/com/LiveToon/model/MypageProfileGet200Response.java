@@ -1,10 +1,11 @@
 package com.LiveToon.model;
 
 import java.util.Objects;
+
+import com.LiveToon.domain.user.entity.User;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import org.springframework.lang.Nullable;
-import org.openapitools.jackson.nullable.JsonNullable;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.media.Schema;
 

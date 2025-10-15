@@ -5,11 +5,12 @@
  */
 package com.LiveToon.api;
 
+import com.LiveToon.domain.user.entity.User;
 import com.LiveToon.model.Achievement;
 import com.LiveToon.model.Error;
 import org.springframework.lang.Nullable;
 import java.util.UUID;
-import com.LiveToon.model.User;
+
 import com.LiveToon.model.UserAchievementsGet200Response;
 import com.LiveToon.model.UserAchievementsIdPatchRequest;
 import com.LiveToon.model.UserSettingsGet200Response;
