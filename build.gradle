@@ -64,7 +64,8 @@ dependencies {
 	//openapi-generator
 	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
 
-
+    // FCM
+    implementation 'com.google.firebase:firebase-admin:6.8.1'
 }
 
 tasks.named('test') {
