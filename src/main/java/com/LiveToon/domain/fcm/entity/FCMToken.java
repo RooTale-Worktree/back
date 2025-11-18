@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Table(name = "fcm_token")
 @Entity
-@Table(name = "fcm_tokens")
 public class FCMToken {
 
     @Id
@@ -29,6 +29,8 @@ public class FCMToken {
     @Column(name = "is_valid", nullable = false)
     private Boolean isValid = true;
 
+    // boolean = true, false | Boolean = true, false, null
+    // 유저가 계정만 생성하고 알림 수신 여부 설정을 안하는 시나리오가 존재
     @Column(name = "notification_enabled", nullable = false)
     private Boolean notificationEnabled = true;
 

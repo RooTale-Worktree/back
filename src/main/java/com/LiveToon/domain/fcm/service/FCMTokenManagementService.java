@@ -1,5 +1,6 @@
 package com.LiveToon.domain.fcm.service;
 
+import com.LiveToon.domain.fcm.entity.FCMToken;
 import com.LiveToon.domain.fcm.repository.FCMTokenRepository;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -17,7 +19,7 @@ public class FCMTokenManagementService {
     private final Logger logger = LoggerFactory.getLogger(FCMTokenManagementService.class);
 
     /**
-     * 로그아웃 시 사용자의 특정 디바이스 토큰을 삭제합니다.
+     * 로그아웃 시 사용자의 특정 디바이스 토큰(특정 기기의 토큰만)을 삭제합니다.
      * 로그아웃 API에서 호출됩니다.
      */
     @Transactional
@@ -25,7 +27,7 @@ public class FCMTokenManagementService {
         if (deviceToken == null || deviceToken.isBlank()) {
             return;
         }
-        fcmTokenRepository.deleteByDeviceToken(deviceToken);
+        fcmTokenRepository.deleteAllByDeviceToken(deviceToken);
         logger.info("로그아웃 처리: User {}의 Token {} 삭제 완료", deviceToken);
     }
 
@@ -48,14 +50,28 @@ public class FCMTokenManagementService {
     /**
      * FCM 발송 실패 시, 유효하지 않은 토큰을 DB에서 삭제합니다.
      * FCMService의 에러 처리 로직에서 호출됩니다.
+     * @param deviceToken 단일 디바이스 토큰값
+     * @return 삭제한 deviceToken 값 리턴 (추후 수정)
      */
     @Transactional
-    public void handleInvalidToken(String deviceToken) {
-        if (deviceToken == null || deviceToken.isBlank()) {
-            return;
-        }
-        fcmTokenRepository.deleteByDeviceToken(deviceToken);
-        logger.warn("유효하지 않은 토큰 삭제 처리: Token {}", deviceToken);
+    public String handleInvalidToken(String deviceToken) {
+        return fcmTokenRepository.deleteAllByDeviceToken(deviceToken).getDeviceToken();
+
+    }
+
+    /**
+     * FCM 발송 실패 시, 유효하지 않은 토큰 여러 개를 DB에서 삭제합니다.
+     * FCMService의 에러 처리 로직에서 호출됩니다.
+     * @param deviceTokens 여러 디바이스 토큰값 리스트
+     * @return 삭제한 deviceToken들 값 리턴 (추후 수정)
+     */
+    @Transactional
+    public List<String> handleInvalidTokens(List<String> deviceTokens) {
+        List<FCMToken> tokens = fcmTokenRepository.deleteByDeviceTokenIn(deviceTokens);
+
+        return tokens.stream()
+                .map(FCMToken::getDeviceToken)
+                .toList();
     }
 }
 
