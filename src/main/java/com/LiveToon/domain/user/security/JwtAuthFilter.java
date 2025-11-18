@@ -1,4 +1,4 @@
-package com.LiveToon.users.security;
+package com.LiveToon.domain.user.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

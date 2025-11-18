@@ -1,4 +1,4 @@
-package com.LiveToon.users.security;
+package com.LiveToon.domain.user.security;
 
 import com.LiveToon.domain.user.entity.User;
 import com.LiveToon.domain.user.repository.UserRepository;

@@ -1,4 +1,4 @@
-package com.LiveToon.users.security.dto;
+package com.LiveToon.domain.user.security.dto;
 
 public record LoginRequest(String username, String password) {
 }

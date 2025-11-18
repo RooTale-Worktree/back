@@ -1,6 +1,8 @@
-package com.LiveToon.users.security;
+package com.LiveToon.domain.user.security;
 
-import com.LiveToon.users.security.dto.*;
+import com.LiveToon.domain.user.security.dto.LoginRequest;
+import com.LiveToon.domain.user.security.dto.LoginResponse;
+import com.LiveToon.domain.user.security.dto.SignupRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;

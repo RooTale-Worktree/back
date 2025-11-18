@@ -1,4 +1,4 @@
-package com.LiveToon.users.security.dto;
+package com.LiveToon.domain.user.security.dto;
 
 public record SignupRequest(String username, String password, String name) {
 }

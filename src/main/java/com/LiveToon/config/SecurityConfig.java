@@ -1,6 +1,6 @@
 package com.LiveToon.config;
 
-import com.LiveToon.users.security.JwtAuthFilter;
+import com.LiveToon.domain.user.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

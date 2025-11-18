@@ -1,8 +1,10 @@
-package com.LiveToon.users.security;
+package com.LiveToon.domain.user.security;
 
 import com.LiveToon.domain.user.entity.User;
 import com.LiveToon.domain.user.repository.UserRepository;
-import com.LiveToon.users.security.dto.*;
+import com.LiveToon.domain.user.security.dto.LoginRequest;
+import com.LiveToon.domain.user.security.dto.LoginResponse;
+import com.LiveToon.domain.user.security.dto.SignupRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
