@@ -65,7 +65,7 @@ dependencies {
 	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
 
     // FCM
-    implementation 'com.google.firebase:firebase-admin:6.8.1'
+    implementation 'com.google.firebase:firebase-admin:9.7.0'
 }
 
 tasks.named('test') {
