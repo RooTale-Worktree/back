@@ -11,7 +11,24 @@ import java.util.Optional;
 @Repository
 public interface UserNodeRepository extends Neo4jRepository<UserNode, Integer> {
 
+    Optional<UserNode> findByUserId(Integer userId);
+
     @Query("MATCH (u:User {user_id: $userId})-[p:PLAY]->(universe:Universe) " +
             "RETURN u, p, universe")
     Optional<UserNode> findByIdWithPlayRelationships(@Param("userId") Integer userId);
+
+    @Query("""
+        MATCH (u:User {user_id: $userId})-[p:PLAY]->(uni:Universe)
+        WHERE p.id = $sessionId
+        DETACH DELETE p
+        RETURN count(p) > 0
+        """)
+    boolean deletePlayRelationshipById(@Param("userId") Integer userId, @Param("sessionId") String sessionId);
+
+    @Query("""
+        MATCH (u:User {user_id: $userId})-[p:PLAY]->(uni:Universe)
+        RETURN count(p)
+        """)
+    long countPlayRelationships(@Param("userId") Integer userId);
+
 }
