@@ -49,6 +49,9 @@ dependencies {
 	implementation 'org.flywaydb:flyway-core'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 
+    // Neo4j - Graph Database
+    implementation 'org.springframework.boot:spring-boot-starter-data-neo4j'
+
 	// Spring Cloud AWS (AWSpring) S3 starter
 	implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0")
 	implementation "io.awspring.cloud:spring-cloud-aws-starter-s3"
@@ -63,6 +66,10 @@ dependencies {
 
 	//openapi-generator
 	implementation 'org.openapitools:jackson-databind-nullable:0.2.6'
+
+    //oauth
+    implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
 
 }
