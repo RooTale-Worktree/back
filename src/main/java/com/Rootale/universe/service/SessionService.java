@@ -2,6 +2,7 @@ package com.Rootale.universe.service;
 
 import com.Rootale.universe.dto.SessionDto;
 import com.Rootale.universe.entity.*;
+import com.Rootale.universe.entity.Character;
 import com.Rootale.universe.exception.ResourceNotFoundException;
 import com.Rootale.universe.repository.CharacterRepository;
 import com.Rootale.universe.repository.UniverseRepository;

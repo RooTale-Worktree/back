@@ -19,8 +19,8 @@ import java.time.LocalDateTime;
 public class PlayRelationship {
 
     @Id
-    @GeneratedValue(generatorClass = UUIDStringGenerator.class)
-    private String id;  // session_id로 사용
+    @GeneratedValue
+    private Long id;  // session_id로 사용
 
     @Property("last_read_node_id")
     private String lastReadNodeId;

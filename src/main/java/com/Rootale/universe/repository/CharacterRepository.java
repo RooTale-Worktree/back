@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface CharacterRepository extends Neo4jRepository<Character, String> {
     Optional<Character> findByCharacterId(String characterId);
 
+    List<Character> findByUniverseId(String universeId);
+
     @Query("""
         MATCH (c:Character {character_id: $characterId})<-[:HAS_CHARACTER]-(u:Universe {universe_id: $universeId})
         RETURN c

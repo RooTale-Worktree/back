@@ -45,7 +45,7 @@ public class SessionDto {
     @Builder
     public record SessionInfo(
             @JsonProperty("session_id")
-            String sessionId,
+            Long sessionId,
 
             @JsonProperty("session_name")
             String sessionName,

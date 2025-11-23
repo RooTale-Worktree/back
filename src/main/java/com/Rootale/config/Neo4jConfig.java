@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 @EnableNeo4jAuditing
 public class Neo4jConfig {
 
-    @Value("${spring.neo4j.uri}")
+    @Value("${spring.neo4j.uri:bolt://localhost:7687}")
     private String uri;
 
     @Value("${spring.neo4j.authentication.username}")
