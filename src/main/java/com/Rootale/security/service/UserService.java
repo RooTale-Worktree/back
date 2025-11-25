@@ -32,6 +32,13 @@ public class UserService {
     @Value("${jwt.refresh-expiration:1209600000}")
     private long refreshExpiration;
 
+    // ⭐ iOS/Android 클라이언트 ID 추가
+    @Value("${google.client-id.ios}")
+    private String iosClientId;
+
+    @Value("${google.client-id.android}")
+    private String androidClientId;
+
     @Transactional
     public LoginResponse socialLogin(SocialLoginRequest request) {
         String provider = request.provider().toLowerCase();
@@ -45,6 +52,11 @@ public class UserService {
         String providerUserId = extractProviderUserId(provider, userInfo);
         String verifiedEmail = extractEmail(provider, userInfo);
         String pictureUrl = extractPictureUrl(provider, userInfo);
+
+        // Google의 경우 iOS/Android audience 검증
+        if ("google".equals(provider)) {
+            verifyGoogleAudience(userInfo);
+        }
 
         if (!email.equalsIgnoreCase(verifiedEmail)) {
             log.warn("⚠️ Email mismatch - requested: {}, verified: {}", email, verifiedEmail);
@@ -78,6 +90,24 @@ public class UserService {
 
         return LoginResponse.of(jwtAccessToken, jwtRefreshToken, accessExpiration / 1000);
     }
+
+    // Google audience 검증
+    private void verifyGoogleAudience(Map<String, Object> userInfo) {
+        String aud = (String) userInfo.get("aud");
+        if (aud == null) {
+            log.error("❌ Google token has no audience claim");
+            throw new IllegalArgumentException("유효하지 않은 Google 토큰입니다 (audience 없음).");
+        }
+
+        // iOS 또는 Android 클라이언트 ID와 일치하는지 확인
+        if (!iosClientId.equals(aud) && !androidClientId.equals(aud)) {
+            log.error("❌ Google token audience mismatch - expected: {} or {}, got: {}",
+                    iosClientId, androidClientId, aud);
+        } else {
+            log.info("✅ Google token audience verified - aud: {}", aud);
+        }
+    }
+
 
     @Transactional
     public LogoutResponse logout(Long userId) {
