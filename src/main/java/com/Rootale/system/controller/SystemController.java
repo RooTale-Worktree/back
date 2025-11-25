@@ -49,27 +49,25 @@ public class SystemController {
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "피드백 제출 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청"),
-            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
+//            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
     })
     @PostMapping("/feedback")
-    public ResponseEntity<FeedbackResponse> createFeedback(
+    public ResponseEntity<?> createFeedback(
             @AuthenticationPrincipal CustomUser currentUser,
             @Valid @RequestBody CreateFeedbackRequest request
     ) {
-        if (currentUser == null) {
-            log.warn("⚠️ Unauthenticated feedback submission attempt");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        log.info("📝 POST /system/feedback - userId: {}, category: {}",
-                currentUser.getUserId(), request.category());
+        // ⭐ currentUser가 null이어도 처리 가능하도록 변경
+        Long userId = currentUser != null ? currentUser.getUserId() : null;
 
         try {
-            FeedbackResponse response = systemService.createFeedback(currentUser.getUserId(), request);
+            FeedbackResponse response = systemService.createFeedback(userId, request);
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
             log.error("❌ Invalid feedback request: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "error", "BAD_REQUEST",
+                    "message", e.getMessage()
+            ));
         }
     }
 

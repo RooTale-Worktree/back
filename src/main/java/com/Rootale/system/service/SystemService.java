@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -36,22 +38,16 @@ public class SystemService {
      */
     @Transactional
     public FeedbackResponse createFeedback(Long userId, CreateFeedbackRequest request) {
-        log.info("📝 Creating feedback - userId: {}, category: {}", userId, request.category());
+        User user = null;
 
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
-
-        // 카테고리 문자열을 Enum으로 변환
-        FeedbackCategory category;
-        try {
-            category = FeedbackCategory.valueOf(request.category().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("유효하지 않은 카테고리입니다: " + request.category());
+        if (userId != null) {
+            user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         }
 
         Feedback feedback = Feedback.builder()
                 .user(user)
-                .category(category)
+                .category(request.category())
                 .title(request.title())
                 .content(request.content())
                 .build();
@@ -60,5 +56,6 @@ public class SystemService {
         log.info("✅ Feedback created - id: {}, userId: {}", savedFeedback.getId(), userId);
 
         return FeedbackResponse.from(savedFeedback);
+
     }
 }

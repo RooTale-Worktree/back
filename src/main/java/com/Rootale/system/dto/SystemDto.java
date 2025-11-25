@@ -2,6 +2,7 @@ package com.Rootale.system.dto;
 
 import com.Rootale.member.entity.Feedback;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -33,14 +34,17 @@ public class SystemDto {
     public record CreateFeedbackRequest(
             @NotBlank(message = "카테고리는 필수입니다")
             @Size(max = 20)
+            @Schema(description = "피드백 카테고리", example = "BUG")
             String category,
 
             @NotBlank(message = "제목은 필수입니다")
             @Size(max = 255, message = "제목은 255자를 넘을 수 없습니다")
+            @Schema(description = "피드백 제목", example = "로그인 버튼이 작동하지 않아요")
             String title,
 
             @NotBlank(message = "내용은 필수입니다")
             @Size(max = 5000, message = "내용은 5000자를 넘을 수 없습니다")
+            @Schema(description = "피드백 내용", example = "iOS 14에서 로그인 버튼을 클릭해도 반응이 없습니다.")
             String content
     ) {}
 
@@ -59,7 +63,7 @@ public class SystemDto {
             return new FeedbackResponse(
                     feedback.getId() != null ? feedback.getId().toString() : null,
                     feedback.getUser() != null ? feedback.getUser().getUsersId().toString() : null,
-                    feedback.getCategory() != null ? feedback.getCategory().name().toLowerCase() : null,
+                    feedback.getCategory(),
                     feedback.getTitle(),
                     feedback.getContent(),
                     feedback.getCreatedAt()

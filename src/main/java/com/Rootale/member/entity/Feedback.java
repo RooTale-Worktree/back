@@ -23,13 +23,12 @@ public class Feedback {
 
     // User : Feedback = 1 : N (N 쪽이 FK)
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "userID", nullable = false)
+    @JoinColumn(name = "userID")
 //    @JsonBackReference // User.feedbacks 와의 순환참조 방지
     private User user;
 
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    private FeedbackCategory category;
+    private String category;
 
     @Column(nullable = false, length = 255)
     private String title;

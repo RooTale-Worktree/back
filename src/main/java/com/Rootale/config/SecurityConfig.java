@@ -27,7 +27,7 @@ public class SecurityConfig {
     @Order(1)
     SecurityFilterChain apiSecurityChain(HttpSecurity http) throws Exception {
         http
-                .securityMatcher("/user/**", "/api/**")
+                .securityMatcher("/user/**")
                 .csrf(csrf -> csrf.disable())
                 .cors(cors -> {})
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -63,7 +63,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/v3/api-docs.yaml",
                                 "/swagger-resources/**", "/webjars/**",
                                 "/actuator/health", "/actuator/info",
-                                "/css/**", "/js/**", "/images/**", "/assets/**", "/static/**", "/favicon.ico"
+                                "/css/**", "/js/**", "/images/**", "/assets/**", "/static/**", "/favicon.ico",
+                                "/health", "/feedback"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
