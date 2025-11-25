@@ -47,7 +47,7 @@ dependencies {
 
 	//migration
 	implementation 'org.flywaydb:flyway-core'
-	implementation 'org.flywaydb:flyway-database-postgresql'
+    implementation 'org.flywaydb:flyway-database-postgresql'
 
     // Neo4j - Graph Database
     implementation 'org.springframework.boot:spring-boot-starter-data-neo4j'
@@ -71,7 +71,8 @@ dependencies {
     implementation "org.springframework.boot:spring-boot-starter-oauth2-client"
     implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
 
-
+    // FCM
+    implementation 'com.google.firebase:firebase-admin:9.7.0'
 }
 
 tasks.named('test') {

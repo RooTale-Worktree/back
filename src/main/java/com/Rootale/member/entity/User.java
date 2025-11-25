@@ -1,5 +1,8 @@
 package com.Rootale.member.entity;
 
+import com.Rootale.fcm.entity.FcmToken;
+import com.Rootale.fcm.entity.Topic;
+import com.Rootale.fcm.entity.UserTopic;
 import com.Rootale.member.enums.UserType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -53,7 +56,7 @@ public class User implements UserDetails {
 
     // 3) 연관관계 설정
     @OneToMany(mappedBy="user", cascade= CascadeType.ALL, orphanRemoval= true)
-    private List<Topic> topics= new ArrayList<>();
+    private List<UserTopic> topics= new ArrayList<>();
 
     @OneToMany(mappedBy="user", cascade= CascadeType.ALL, orphanRemoval= true)
     private List<Feedback> feedbacks= new ArrayList<>();

@@ -1,5 +1,6 @@
 package com.Rootale.security.service;
 
+import com.Rootale.fcm.entity.FcmToken;
 import com.Rootale.member.entity.*;
 import com.Rootale.member.enums.UserType;
 import com.Rootale.member.repository.*;
@@ -31,6 +32,13 @@ public class UserService {
     @Value("${jwt.refresh-expiration:1209600000}")
     private long refreshExpiration;
 
+    // ⭐ iOS/Android 클라이언트 ID 추가
+    @Value("${google.client-id.ios}")
+    private String iosClientId;
+
+    @Value("${google.client-id.android}")
+    private String androidClientId;
+
     @Transactional
     public LoginResponse socialLogin(SocialLoginRequest request) {
         String provider = request.provider().toLowerCase();
@@ -44,6 +52,11 @@ public class UserService {
         String providerUserId = extractProviderUserId(provider, userInfo);
         String verifiedEmail = extractEmail(provider, userInfo);
         String pictureUrl = extractPictureUrl(provider, userInfo);
+
+        // Google의 경우 iOS/Android audience 검증
+        if ("google".equals(provider)) {
+            verifyGoogleAudience(userInfo);
+        }
 
         if (!email.equalsIgnoreCase(verifiedEmail)) {
             log.warn("⚠️ Email mismatch - requested: {}, verified: {}", email, verifiedEmail);
@@ -65,6 +78,7 @@ public class UserService {
 
         User user = oauthAccount.getUser();
 
+        // fcmToken이 새로운 값이 아니면 addFcmToken
         if (fcmToken != null && !fcmToken.isBlank()) {
             updateFcmToken(user, fcmToken);
         }
@@ -77,6 +91,24 @@ public class UserService {
         return LoginResponse.of(jwtAccessToken, jwtRefreshToken, accessExpiration / 1000);
     }
 
+    // Google audience 검증
+    private void verifyGoogleAudience(Map<String, Object> userInfo) {
+        String aud = (String) userInfo.get("aud");
+        if (aud == null) {
+            log.error("❌ Google token has no audience claim");
+            throw new IllegalArgumentException("유효하지 않은 Google 토큰입니다 (audience 없음).");
+        }
+
+        // iOS 또는 Android 클라이언트 ID와 일치하는지 확인
+        if (!iosClientId.equals(aud) && !androidClientId.equals(aud)) {
+            log.error("❌ Google token audience mismatch - expected: {} or {}, got: {}",
+                    iosClientId, androidClientId, aud);
+        } else {
+            log.info("✅ Google token audience verified - aud: {}", aud);
+        }
+    }
+
+
     @Transactional
     public LogoutResponse logout(Long userId) {
         log.info("🔴 Logout - userId: {}", userId);
@@ -85,7 +117,7 @@ public class UserService {
 
         boolean fcmTokenRemoved = false;
         if (!user.getFcmTokens().isEmpty()) {
-            user.getFcmTokens().forEach(token -> token.setActive(false));
+            user.getFcmTokens().forEach(token -> token.setIsActive(false));
             fcmTokenRemoved = true;
             log.info("📱 FCM tokens deactivated for userId: {}", userId);
         }
@@ -149,7 +181,7 @@ public class UserService {
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
         user.setActive(false);
-        user.getFcmTokens().forEach(token -> token.setActive(false));
+        user.getFcmTokens().forEach(token -> token.setIsActive(false));
         userRepository.save(user);
 
         log.info("✅ User withdrawn - userId: {}", userId);
@@ -272,6 +304,7 @@ public class UserService {
         return oauthAccountRepository.save(oauthAccount);
     }
 
+    // User 도메인에서 fcm토큰 처리를 하는 게 좋을지? 둘의 연관성은 매우 강하긴 함.
     private void updateFcmToken(User user, String fcmToken) {
         log.info("📱 Updating FCM token for userId: {}", user.getUsersId());
         FcmToken token = user.getFcmTokens().stream()
@@ -281,13 +314,14 @@ public class UserService {
                     FcmToken newToken = FcmToken.builder()
                             .user(user)
                             .deviceToken(fcmToken)
-                            .isActive(true)
-                            .notificationEnabled(true)
+                            //.isActive(true)
+                            //.notificationEnabled(true)
                             .build();
                     user.getFcmTokens().add(newToken);
                     return newToken;
                 });
         token.setTokenCheckTime(LocalDateTime.now());
-        token.setActive(true);
+        token.setIsActive(true);
     }
+
 }
