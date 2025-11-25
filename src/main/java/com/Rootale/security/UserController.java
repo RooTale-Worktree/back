@@ -35,12 +35,12 @@ public class UserController {
 
     @Operation(
             summary = "소셜 로그인",
-            description = "카카오/네이버/구글의 access token을 받아 서버 JWT를 발급합니다."
+            description = "카카오/네이버/구글의 id token을 받아 서버 JWT를 발급합니다."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "로그인 성공"),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (파라미터 오류)"),
-            @ApiResponse(responseCode = "401", description = "유효하지 않은 access token"),
+            @ApiResponse(responseCode = "401", description = "유효하지 않은 ID token"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")
     })
     @PostMapping("/login")
@@ -84,16 +84,16 @@ public class UserController {
         } catch (RuntimeException e) {
             // 세부 에러 타입 구분
             if (e.getMessage() != null) {
-                if (e.getMessage().contains("유효하지 않은 access token")) {
+                if (e.getMessage().contains("유효하지 않은")) {
                     // 401 Unauthorized
-                    log.error("❌ Invalid access token: {}", e.getMessage());
+                    log.error("❌ Invalid token: {}", e.getMessage());
                     String errorDetail = extractErrorDetail(e.getMessage());
 
                     return ResponseEntity
                             .status(HttpStatus.UNAUTHORIZED)
                             .body(createErrorResponse(
                                     "INVALID_TOKEN",
-                                    "유효하지 않은 access token입니다.",
+                                    "유효하지 않은 token입니다.",
                                     Map.of(
                                             "provider", request.provider(),
                                             "detail", errorDetail
@@ -161,9 +161,6 @@ public class UserController {
         if (fullMessage == null) {
             return "Unknown error";
         }
-
-        // "유효하지 않은 access token입니다: 401 Unauthorized: {...}"
-        // → "401 Unauthorized" or "Invalid Credentials" 추출
 
         // 1) "401 Unauthorized" 같은 HTTP 상태 추출
         if (fullMessage.contains("401 Unauthorized")) {
@@ -265,7 +262,7 @@ public class UserController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "토큰 갱신", description = "Refresh Token으로 새로운 Access Token과 Refresh Token을 발급받습니다.")
+    @Operation(summary = "토큰 갱신", description = "Refresh Token으로 새로운 id Token과 Refresh Token을 발급받습니다.")
     @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         log.info("🔄 POST /user/refresh");

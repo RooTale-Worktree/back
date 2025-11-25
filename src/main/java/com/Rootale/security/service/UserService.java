@@ -42,13 +42,14 @@ public class UserService {
     @Transactional
     public LoginResponse socialLogin(SocialLoginRequest request) {
         String provider = request.provider().toLowerCase();
-        String accessToken = request.token();
+        String idToken = request.token();
         String email = request.email();
         String fcmToken = request.fcm_token();
 
         log.info("🔵 Social login - provider: {}, email: {}", provider, email);
 
-        Map<String, Object> userInfo = fetchUserInfoFromProvider(provider, accessToken);
+        // ⭐ Google은 ID Token 검증, Kakao/Naver는 Access Token으로 UserInfo 조회
+        Map<String, Object> userInfo = fetchUserInfoFromProvider(provider, idToken);
         String providerUserId = extractProviderUserId(provider, userInfo);
         String verifiedEmail = extractEmail(provider, userInfo);
         String pictureUrl = extractPictureUrl(provider, userInfo);
@@ -78,7 +79,6 @@ public class UserService {
 
         User user = oauthAccount.getUser();
 
-        // fcmToken이 새로운 값이 아니면 addFcmToken
         if (fcmToken != null && !fcmToken.isBlank()) {
             updateFcmToken(user, fcmToken);
         }
@@ -91,21 +91,78 @@ public class UserService {
         return LoginResponse.of(jwtAccessToken, jwtRefreshToken, accessExpiration / 1000);
     }
 
-    // Google audience 검증
+    /**
+     * ⭐ Google ID Token 또는 Kakao/Naver Access Token으로 사용자 정보 조회
+     */
+    private Map<String, Object> fetchUserInfoFromProvider(String provider, String token) {
+        String userInfoUrl = switch (provider) {
+            case "google" -> "https://www.googleapis.com/oauth2/v3/tokeninfo";  // ⭐ ID Token 검증 엔드포인트
+            case "kakao" -> "https://kapi.kakao.com/v2/user/me";
+            case "naver" -> "https://openapi.naver.com/v1/nid/me";
+            default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
+        };
+
+        try {
+            RestClient restClient = RestClient.create();
+            Map<String, Object> response;
+
+            if ("google".equals(provider)) {
+                // ⭐ Google: ID Token을 쿼리 파라미터로 전송
+                log.debug("🔍 Verifying Google ID Token");
+                response = restClient.get()
+                        .uri(userInfoUrl + "?id_token=" + token.trim())
+                        .retrieve()
+                        .body(Map.class);
+            } else {
+                // Kakao/Naver: Access Token을 Authorization 헤더로 전송
+                log.debug("🔍 Fetching user info from {} with access token", provider);
+                response = restClient.get()
+                        .uri(userInfoUrl)
+                        .header("Authorization", "Bearer " + token.trim())
+                        .retrieve()
+                        .body(Map.class);
+            }
+
+            if (response == null) {
+                throw new RuntimeException("소셜 플랫폼으로부터 사용자 정보를 받을 수 없습니다.");
+            }
+
+            log.debug("✅ User info received from {}: {}", provider, response.keySet());
+            return response;
+
+        } catch (RestClientException e) {
+            log.error("❌ Failed to fetch user info from {}: {}", provider, e.getMessage());
+
+            // ⭐ Google ID Token 검증 실패 시 더 명확한 메시지
+            if ("google".equals(provider)) {
+                throw new RuntimeException("유효하지 않은 Google ID Token입니다: " + e.getMessage());
+            }
+            throw new RuntimeException("유효하지 않은 access token입니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Google Audience (클라이언트 ID) 검증
+     */
     private void verifyGoogleAudience(Map<String, Object> userInfo) {
+        // ⭐ Google ID Token의 경우 "aud" 클레임으로 클라이언트 ID 확인
         String aud = (String) userInfo.get("aud");
         if (aud == null) {
-            log.error("❌ Google token has no audience claim");
-            throw new IllegalArgumentException("유효하지 않은 Google 토큰입니다 (audience 없음).");
+            log.error("❌ Google ID Token has no audience claim");
+            throw new IllegalArgumentException("유효하지 않은 Google ID Token입니다 (audience 없음).");
         }
 
         // iOS 또는 Android 클라이언트 ID와 일치하는지 확인
         if (!iosClientId.equals(aud) && !androidClientId.equals(aud)) {
-            log.error("❌ Google token audience mismatch - expected: {} or {}, got: {}",
+            log.error("❌ Google ID Token audience mismatch - expected: {} or {}, got: {}",
                     iosClientId, androidClientId, aud);
-        } else {
-            log.info("✅ Google token audience verified - aud: {}", aud);
+            throw new IllegalArgumentException(
+                    String.format("유효하지 않은 Google 클라이언트 ID입니다. 예상: %s 또는 %s, 실제: %s",
+                            iosClientId, androidClientId, aud)
+            );
         }
+
+        log.info("✅ Google ID Token audience verified - aud: {}", aud);
     }
 
 
@@ -188,32 +245,6 @@ public class UserService {
         return WithdrawResponse.of("회원 탈퇴가 완료되었습니다");
     }
 
-    // Private helper methods...
-    private Map<String, Object> fetchUserInfoFromProvider(String provider, String accessToken) {
-        String userInfoUrl = switch (provider) {
-            case "google" -> "https://www.googleapis.com/oauth2/v3/userinfo";
-            case "kakao" -> "https://kapi.kakao.com/v2/user/me";
-            case "naver" -> "https://openapi.naver.com/v1/nid/me";
-            default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
-        };
-
-        try {
-            RestClient restClient = RestClient.create();
-            Map<String, Object> response = restClient.get()
-                    .uri(userInfoUrl)
-                    .header("Authorization", "Bearer " + accessToken)
-                    .retrieve()
-                    .body(Map.class);
-
-            if (response == null) {
-                throw new RuntimeException("소셜 플랫폼으로부터 사용자 정보를 받을 수 없습니다.");
-            }
-            return response;
-        } catch (RestClientException e) {
-            log.error("❌ Failed to fetch user info from {}: {}", provider, e.getMessage());
-            throw new RuntimeException("유효하지 않은 access token입니다: " + e.getMessage());
-        }
-    }
 
     private String extractProviderUserId(String provider, Map<String, Object> userInfo) {
         return switch (provider) {
