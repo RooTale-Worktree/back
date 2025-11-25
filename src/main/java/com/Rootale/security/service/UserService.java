@@ -25,19 +25,13 @@ public class UserService {
     private final UserRepository userRepository;
     private final OAuthAccountRepository oauthAccountRepository;
     private final JwtTokenService jwtTokenService;
+    private final GoogleTokenVerifier googleTokenVerifier;
 
     @Value("${jwt.access-expiration:1800000}")
     private long accessExpiration;
 
     @Value("${jwt.refresh-expiration:1209600000}")
     private long refreshExpiration;
-
-    // ⭐ iOS/Android 클라이언트 ID 추가
-    @Value("${google.client-id.ios}")
-    private String iosClientId;
-
-    @Value("${google.client-id.android}")
-    private String androidClientId;
 
     @Transactional
     public LoginResponse socialLogin(SocialLoginRequest request) {
@@ -53,11 +47,6 @@ public class UserService {
         String providerUserId = extractProviderUserId(provider, userInfo);
         String verifiedEmail = extractEmail(provider, userInfo);
         String pictureUrl = extractPictureUrl(provider, userInfo);
-
-        // Google의 경우 iOS/Android audience 검증
-        if ("google".equals(provider)) {
-            verifyGoogleAudience(userInfo);
-        }
 
         if (!email.equalsIgnoreCase(verifiedEmail)) {
             log.warn("⚠️ Email mismatch - requested: {}, verified: {}", email, verifiedEmail);
@@ -95,33 +84,27 @@ public class UserService {
      * ⭐ Google ID Token 또는 Kakao/Naver Access Token으로 사용자 정보 조회
      */
     private Map<String, Object> fetchUserInfoFromProvider(String provider, String token) {
-        String userInfoUrl = switch (provider) {
-            case "google" -> "https://www.googleapis.com/oauth2/v3/tokeninfo";  // ⭐ ID Token 검증 엔드포인트
-            case "kakao" -> "https://kapi.kakao.com/v2/user/me";
-            case "naver" -> "https://openapi.naver.com/v1/nid/me";
-            default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
-        };
-
         try {
-            RestClient restClient = RestClient.create();
-            Map<String, Object> response;
-
             if ("google".equals(provider)) {
-                // ⭐ Google: ID Token을 쿼리 파라미터로 전송
-                log.debug("🔍 Verifying Google ID Token");
-                response = restClient.get()
-                        .uri(userInfoUrl + "?id_token=" + token.trim())
-                        .retrieve()
-                        .body(Map.class);
-            } else {
-                // Kakao/Naver: Access Token을 Authorization 헤더로 전송
-                log.debug("🔍 Fetching user info from {} with access token", provider);
-                response = restClient.get()
-                        .uri(userInfoUrl)
-                        .header("Authorization", "Bearer " + token.trim())
-                        .retrieve()
-                        .body(Map.class);
+                // ⭐ Google: 공식 라이브러리로 ID Token 검증
+                log.debug("🔍 Verifying Google ID Token with official library");
+                return googleTokenVerifier.verifyIdToken(token);
             }
+
+            // Kakao/Naver: Access Token으로 UserInfo API 호출
+            String userInfoUrl = switch (provider) {
+                case "kakao" -> "https://kapi.kakao.com/v2/user/me";
+                case "naver" -> "https://openapi.naver.com/v1/nid/me";
+                default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
+            };
+
+            log.debug("🔍 Fetching user info from {} with access token", provider);
+            RestClient restClient = RestClient.create();
+            Map<String, Object> response = restClient.get()
+                    .uri(userInfoUrl)
+                    .header("Authorization", "Bearer " + token.trim())
+                    .retrieve()
+                    .body(Map.class);
 
             if (response == null) {
                 throw new RuntimeException("소셜 플랫폼으로부터 사용자 정보를 받을 수 없습니다.");
@@ -132,37 +115,8 @@ public class UserService {
 
         } catch (RestClientException e) {
             log.error("❌ Failed to fetch user info from {}: {}", provider, e.getMessage());
-
-            // ⭐ Google ID Token 검증 실패 시 더 명확한 메시지
-            if ("google".equals(provider)) {
-                throw new RuntimeException("유효하지 않은 Google ID Token입니다: " + e.getMessage());
-            }
             throw new RuntimeException("유효하지 않은 access token입니다: " + e.getMessage());
         }
-    }
-
-    /**
-     * Google Audience (클라이언트 ID) 검증
-     */
-    private void verifyGoogleAudience(Map<String, Object> userInfo) {
-        // ⭐ Google ID Token의 경우 "aud" 클레임으로 클라이언트 ID 확인
-        String aud = (String) userInfo.get("aud");
-        if (aud == null) {
-            log.error("❌ Google ID Token has no audience claim");
-            throw new IllegalArgumentException("유효하지 않은 Google ID Token입니다 (audience 없음).");
-        }
-
-        // iOS 또는 Android 클라이언트 ID와 일치하는지 확인
-        if (!iosClientId.equals(aud) && !androidClientId.equals(aud)) {
-            log.error("❌ Google ID Token audience mismatch - expected: {} or {}, got: {}",
-                    iosClientId, androidClientId, aud);
-            throw new IllegalArgumentException(
-                    String.format("유효하지 않은 Google 클라이언트 ID입니다. 예상: %s 또는 %s, 실제: %s",
-                            iosClientId, androidClientId, aud)
-            );
-        }
-
-        log.info("✅ Google ID Token audience verified - aud: {}", aud);
     }
 
 
