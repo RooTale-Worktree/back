@@ -11,11 +11,14 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
+        //origin(fe, swagger)-> 서버
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "http://localhost:8081",
                 "http://localhost:8080",
-                "http://10.0.2.2:8080"
+                "http://10.0.2.2:8080",
+                "http://ec2-13-125-90-89.ap-northeast-2.compute.amazonaws.com",
+                "http://rootale.swagger.s3-website.ap-northeast-2.amazonaws.com/#/System/createFeedback"
         ));
         config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
