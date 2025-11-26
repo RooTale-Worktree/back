@@ -18,7 +18,13 @@ public class CorsConfig {
                 "http://localhost:8080",
                 "http://10.0.2.2:8080",
                 "http://ec2-13-125-90-89.ap-northeast-2.compute.amazonaws.com",
-                "http://rootale.swagger.s3-website.ap-northeast-2.amazonaws.com/#/System/createFeedback"
+                "http://rootale.swagger.s3-website.ap-northeast-2.amazonaws.com"
+                "https://localhost:3000",
+                "https://localhost:8081",
+                "https://localhost:8080",
+                "https://10.0.2.2:8080",
+                "https://ec2-13-125-90-89.ap-northeast-2.compute.amazonaws.com",
+                "https://rootale.swagger.s3-website.ap-northeast-2.amazonaws.com"
         ));
         config.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
