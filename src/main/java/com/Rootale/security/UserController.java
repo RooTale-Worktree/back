@@ -6,6 +6,7 @@ import com.Rootale.member.entity.CustomUser;
 import com.Rootale.security.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -38,7 +39,20 @@ public class UserController {
             description = "카카오/네이버/구글의 id token을 받아 서버 JWT를 발급합니다."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "로그인 성공"),
+            @ApiResponse(responseCode = "200", description = "로그인 성공", content = @Content(
+            mediaType = "application/json",
+            schema = @Schema(implementation = LoginResponse.class),
+            examples = @ExampleObject(
+                    value = """
+                                    {
+                                        "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                                        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                                        "expires_in": 1800
+                                    }
+                                    """
+            )
+    )
+            ),
             @ApiResponse(responseCode = "400", description = "잘못된 요청 (파라미터 오류)"),
             @ApiResponse(responseCode = "401", description = "유효하지 않은 ID token"),
             @ApiResponse(responseCode = "500", description = "서버 내부 오류")

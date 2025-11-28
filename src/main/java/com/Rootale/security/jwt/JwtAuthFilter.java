@@ -2,6 +2,8 @@
 package com.Rootale.security.jwt;
 
 import com.Rootale.member.entity.CustomUser;
+import com.Rootale.member.entity.User;
+import com.Rootale.member.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.*;
@@ -10,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -22,7 +25,8 @@ import java.util.List;
 @RequiredArgsConstructor
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtTokenService jwtTokenService;  // ⭐ JwtUtil 대신 JwtTokenService 사용
+    private final UserRepository userRepository;
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     // 인증이 필요없는 경로
@@ -39,10 +43,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String uri = request.getRequestURI();
 
-        // OPTIONS (CORS preflight)
-        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
-            return true;
-        }
+//        // OPTIONS (CORS preflight)
+//        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+//            return true;
+//        }
 
         // Whitelist 체크
         for (String pattern : WHITELIST) {
@@ -58,39 +62,55 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
 
+        String token = resolveToken(req);
+
+        if (token == null) {
+            log.debug("🔒 No JWT token found in request");
+            chain.doFilter(req, res);
+            return;
+        }
+
         try {
-            String token = resolveToken(req);
+            // ⭐ JwtTokenService로 토큰 검증
+            if (!jwtTokenService.validateToken(token)) {
+                log.warn("⚠️ Invalid JWT token");
+                chain.doFilter(req, res);
+                return;
+            }
 
-            if (token != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                if (jwtUtil.isValid(token)) {
-                    // JWT에서 사용자 정보 추출
-                    String subject = jwtUtil.extractSubject(token);
-                    String username = jwtUtil.extractClaim(token, "username");
-                    String userIdStr = jwtUtil.extractClaim(token, "userId");
+            // ⭐ 토큰에서 userId 추출
+            Long userId = jwtTokenService.extractUserIdFromAccessToken(token);
+            log.debug("🔑 Extracted userId from token: {}", userId);
 
-                    Long userId = userIdStr != null ? Long.parseLong(userIdStr) : Long.parseLong(subject);
+            // ⭐ DB에서 사용자 조회
+            User user = userRepository.findById(userId).orElse(null);
+            if (user == null || !user.isActive()) {
+                log.warn("⚠️ User not found or inactive: {}", userId);
+                chain.doFilter(req, res);
+                return;
+            }
 
-                    // CustomUser 객체 생성
-                    CustomUser customUser = new CustomUser(
-                            userId,
-                            username != null ? username : subject,
-                            null,
-                            List.of(new SimpleGrantedAuthority("ROLE_USER"))
-                    );
+            // ⭐ CustomUser 생성 및 인증 설정
+            CustomUser customUser = new CustomUser(
+                    user.getUsersId(),
+                    user.getEmail(),
+                    user.getPassword(),
+                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
+            );
 
-                    // SecurityContext에 인증 정보 저장
-                    var auth = new UsernamePasswordAuthenticationToken(
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
                             customUser,
                             null,
                             customUser.getAuthorities()
                     );
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(req));
 
-                    SecurityContextHolder.getContext().setAuthentication(auth);
-                    log.debug("✅ JWT authentication successful - userId: {}", userId);
-                }
-            }
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            log.debug("✅ Authentication set for userId: {}", userId);
+
         } catch (Exception e) {
-            log.debug("⚠️ JWT validation failed: {}", e.getMessage());
+            log.error("❌ JWT authentication failed: {}", e.getMessage(), e);
         }
 
         chain.doFilter(req, res);
@@ -98,9 +118,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private String resolveToken(HttpServletRequest req) {
         // Authorization 헤더에서 Bearer 토큰 추출
-        String header = req.getHeader("Authorization");
-        if (header != null && header.startsWith("Bearer ")) {
-            return header.substring(7);
+        String bearerToken = req.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
         }
         return null;
     }

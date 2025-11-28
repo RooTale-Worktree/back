@@ -51,8 +51,13 @@ public class OAuthDto {
      * 로그인 응답
      */
     public record LoginResponse(
+            @JsonProperty("token")
             String token,
+
+            @JsonProperty("refresh_token")
             String refresh_token,
+
+            @JsonProperty("expires_in")
             long expires_in
     ) {
         public static OAuthDto.LoginResponse of(String accessToken, String refreshToken, long expiresInSeconds) {
