@@ -26,6 +26,8 @@ public class UserService {
     private final OAuthAccountRepository oauthAccountRepository;
     private final JwtTokenService jwtTokenService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final AppleTokenVerifier appleTokenVerifier;
+    private final KakaoTokenVerifier kakaoTokenVerifier;
 
     @Value("${jwt.access-expiration:1800000}")
     private long accessExpiration;
@@ -91,27 +93,38 @@ public class UserService {
                 return googleTokenVerifier.verifyIdToken(token);
             }
 
-            // Kakao/Naver: Access Token으로 UserInfo API 호출
-            String userInfoUrl = switch (provider) {
-                case "kakao" -> "https://kapi.kakao.com/v2/user/me";
-                case "naver" -> "https://openapi.naver.com/v1/nid/me";
-                default -> throw new IllegalArgumentException("Unsupported provider: " + provider);
-            };
-
-            log.debug("🔍 Fetching user info from {} with access token", provider);
-            RestClient restClient = RestClient.create();
-            Map<String, Object> response = restClient.get()
-                    .uri(userInfoUrl)
-                    .header("Authorization", "Bearer " + token.trim())
-                    .retrieve()
-                    .body(Map.class);
-
-            if (response == null) {
-                throw new RuntimeException("소셜 플랫폼으로부터 사용자 정보를 받을 수 없습니다.");
+            if ("apple".equals(provider)) {
+                log.debug("🔍 Verifying Apple ID Token");
+                return appleTokenVerifier.verifyIdToken(token);
             }
 
-            log.debug("✅ User info received from {}: {}", provider, response.keySet());
-            return response;
+            if ("kakao".equals(provider)) {
+                // ⭐ Kakao: KakaoTokenVerifier로 Access Token 검증
+                log.debug("🔍 Verifying Kakao Access Token");
+                return kakaoTokenVerifier.verifyAccessToken(token);
+            }
+
+            // Naver: Access Token으로 UserInfo API 호출
+            if ("naver".equals(provider)) {
+                String userInfoUrl = "https://openapi.naver.com/v1/nid/me";
+                log.debug("🔍 Fetching user info from {} with access token", provider);
+                RestClient restClient = RestClient.create();
+                Map<String, Object> response = restClient.get()
+                        .uri(userInfoUrl)
+                        .header("Authorization", "Bearer " + token.trim())
+                        .retrieve()
+                        .body(Map.class);
+
+                if (response == null) {
+                    throw new RuntimeException("소셜 플랫폼으로부터 사용자 정보를 받을 수 없습니다.");
+                }
+
+                log.debug("✅ User info received from {}: {}", provider, response.keySet());
+                return response;
+            }
+
+            throw new IllegalArgumentException("Unsupported provider: " + provider);
+
 
         } catch (RestClientException e) {
             log.error("❌ Failed to fetch user info from {}: {}", provider, e.getMessage());
@@ -233,6 +246,7 @@ public class UserService {
     private String extractPictureUrl(String provider, Map<String, Object> userInfo) {
         return switch (provider) {
             case "google" -> (String) userInfo.get("picture");
+            case "apple" -> null;  // Apple은 프로필 이미지 제공 안함
             case "kakao" -> {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.get("kakao_account");
