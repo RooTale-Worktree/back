@@ -86,6 +86,35 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             throw e;
         }
     }
+
+    /**
+     * 새로운 세계관 생성
+     */
+    public UniverseDto.CreateUniverseResponse createUniverse(UniverseDto.CreateUniverseRequest request) {
+        try {
+            log.info("🆕 Creating new universe: {}", request.name());
+
+            LocalDateTime now = LocalDateTime.now();
+            Universe universe = Universe.builder()
+                    .name(request.name())
+                    .description(request.description())
+                    .story(request.story())
+                    .canon(request.canon())
+                    .representativeImage(request.representativeImage())
+                    .estimatedPlayTime(request.estimatedPlayTime())
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+
+            Universe savedUniverse = universeRepository.save(universe);
+            log.info("✅ Universe created successfully with ID: {}", savedUniverse.getUniverseId());
+
+            return toCreateUniverseResponse(savedUniverse);
+        } catch (Exception e) {
+            log.error("❌ Failed to create universe: {}", e.getMessage(), e);
+            throw new RuntimeException("세계관 생성 실패: " + e.getMessage(), e);
+        }
+    }
     // ===== Mapper methods =====
 
     private UniverseDto.UniverseSummary toUniverseSummary(Universe universe) {
@@ -122,6 +151,20 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
                 character.getPersonality() != null
                         ? String.join(", ", character.getPersonality())
                         : ""
+        );
+    }
+
+    private UniverseDto.CreateUniverseResponse toCreateUniverseResponse(Universe universe) {
+        return new UniverseDto.CreateUniverseResponse(
+                universe.getUniverseId(),
+                universe.getName(),
+                universe.getDescription(),
+                universe.getStory(),
+                universe.getCanon(),
+                universe.getRepresentativeImage(),
+                universe.getEstimatedPlayTime(),
+                universe.getCreatedAt(),
+                universe.getUpdatedAt()
         );
     }
 

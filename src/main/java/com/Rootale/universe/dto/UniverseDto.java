@@ -1,10 +1,52 @@
 package com.Rootale.universe.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 public class UniverseDto {
+
+    /**
+     * 세계관 생성 요청
+     */
+    public record CreateUniverseRequest(
+            @NotBlank(message = "세계관 이름은 필수입니다")
+            @Size(max = 255, message = "이름은 255자를 초과할 수 없습니다")
+            String name,
+
+            @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
+            String description,
+
+            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
+            String story,
+
+            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
+            String canon,
+
+            @JsonProperty("representative_image")
+            String representativeImage,
+
+            @JsonProperty("estimated_play_time")
+            Integer estimatedPlayTime
+    ) {}
+
+    /**
+     * 세계관 생성 응답
+     */
+    public record CreateUniverseResponse(
+            String id,
+            String name,
+            String description,
+            String story,
+            String canon,
+            @JsonProperty("representative_image") String representativeImage,
+            @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
+            @JsonProperty("created_at") LocalDateTime createdAt,
+            @JsonProperty("updated_at") LocalDateTime updatedAt
+    ) {}
 
     /**
      * 세계관 목록 응답
