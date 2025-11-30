@@ -21,6 +21,7 @@ public class Character {
 
     @Id
     @GeneratedValue(generatorClass = UUIDStringGenerator.class)
+    @Property("character_id")
     private String characterId;
 
     @Property("name")

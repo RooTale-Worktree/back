@@ -9,7 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.time.*;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -27,7 +28,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     public UniverseDto.UniverseListResponse getAllUniverses() {
         try {
             log.info("📋 Fetching all universes");
-            List<Universe> universes = universeRepository.findAll();
+            List<Universe> universes = universeRepository.findAllUniverses();
             log.info("✅ Found {} universes", universes.size());
 
             List<UniverseDto.UniverseSummary> summaries = universes.stream()
@@ -40,6 +41,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             throw new RuntimeException("세계관 목록 조회 실패: " + e.getMessage(), e);
         }
     }
+
 
     /**
      * 특정 세계관 상세 조회
