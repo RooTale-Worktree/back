@@ -50,7 +50,11 @@ public class UserService {
         String verifiedEmail = extractEmail(provider, userInfo);
         String pictureUrl = extractPictureUrl(provider, userInfo);
 
-        if (!email.equalsIgnoreCase(verifiedEmail)) {
+        // ⭐ Apple의 경우 토큰에서 추출한 이메일을 우선 사용
+        String finalEmail = "apple".equals(provider) ? verifiedEmail : email;
+
+        // ⭐ Apple이 아닌 경우에만 이메일 일치 검증
+        if (!"apple".equals(provider) && !email.equalsIgnoreCase(verifiedEmail)) {
             log.warn("⚠️ Email mismatch - requested: {}, verified: {}", email, verifiedEmail);
             throw new IllegalArgumentException("이메일 정보가 일치하지 않습니다.");
         }
@@ -63,9 +67,9 @@ public class UserService {
                     User existingUser = userRepository.findByEmail(email).orElse(null);
                     if (existingUser != null) {
                         log.info("✅ Found existing user by email - userId: {}", existingUser.getUsersId());
-                        return linkOAuthToExistingUser(existingUser, provider, providerUserId, email, pictureUrl);
+                        return linkOAuthToExistingUser(existingUser, provider, providerUserId, finalEmail, pictureUrl);
                     }
-                    return createNewUserWithOAuth(provider, providerUserId, email, pictureUrl);
+                    return createNewUserWithOAuth(provider, providerUserId, finalEmail, pictureUrl);
                 });
 
         User user = oauthAccount.getUser();
@@ -216,6 +220,7 @@ public class UserService {
     private String extractProviderUserId(String provider, Map<String, Object> userInfo) {
         return switch (provider) {
             case "google" -> (String) userInfo.get("sub");
+            case "apple" -> (String) userInfo.get("sub");
             case "kakao" -> String.valueOf(userInfo.get("id"));
             case "naver" -> {
                 @SuppressWarnings("unchecked")
@@ -229,6 +234,7 @@ public class UserService {
     private String extractEmail(String provider, Map<String, Object> userInfo) {
         return switch (provider) {
             case "google" -> (String) userInfo.get("email");
+            case "apple" -> (String) userInfo.get("email");
             case "kakao" -> {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> kakaoAccount = (Map<String, Object>) userInfo.get("kakao_account");
