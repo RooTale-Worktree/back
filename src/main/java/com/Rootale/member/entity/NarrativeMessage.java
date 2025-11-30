@@ -33,6 +33,9 @@ public class NarrativeMessage {
     @Column(name = "content", nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 

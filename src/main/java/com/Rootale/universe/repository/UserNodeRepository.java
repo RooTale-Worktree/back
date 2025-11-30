@@ -1,12 +1,15 @@
 package com.Rootale.universe.repository;
 
+import com.Rootale.universe.entity.Character;
 import com.Rootale.universe.entity.UserNode;
 import org.springframework.data.neo4j.repository.Neo4jRepository;
 import org.springframework.data.neo4j.repository.query.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 public interface UserNodeRepository extends Neo4jRepository<UserNode, Integer> {
@@ -30,5 +33,4 @@ public interface UserNodeRepository extends Neo4jRepository<UserNode, Integer> {
         RETURN count(p)
         """)
     long countPlayRelationships(@Param("userId") Integer userId);
-
 }
