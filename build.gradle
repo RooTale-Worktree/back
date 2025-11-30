@@ -52,6 +52,9 @@ dependencies {
     // Neo4j - Graph Database
     implementation 'org.springframework.boot:spring-boot-starter-data-neo4j'
 
+    // WebFlux, WebClient
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
 	// Spring Cloud AWS (AWSpring) S3 starter
 	implementation platform("io.awspring.cloud:spring-cloud-aws-dependencies:3.4.0")
 	implementation "io.awspring.cloud:spring-cloud-aws-starter-s3"

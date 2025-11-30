@@ -6,14 +6,19 @@ import com.Rootale.member.entity.User;
 import com.Rootale.member.repository.ImageGenerationCallbackRepository;
 import com.Rootale.member.repository.NarrativeMessageRepository;
 import com.Rootale.member.repository.UserRepository;
+import com.Rootale.universe.dto.LlmDto;
 import com.Rootale.universe.dto.NarrativeDto;
-import com.Rootale.universe.entity.PlayRelationship;
+import com.Rootale.universe.entity.Character;
+import com.Rootale.universe.entity.Universe;
 import com.Rootale.universe.entity.UserNode;
 import com.Rootale.universe.exception.ResourceNotFoundException;
+import com.Rootale.universe.repository.CharacterRepository;
+import com.Rootale.universe.repository.UniverseRepository;
 import com.Rootale.universe.repository.UserNodeRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +26,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
+
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,72 +45,136 @@ public class NarrativeService {
     private final NarrativeMessageRepository messageRepository;
     private final ImageGenerationCallbackRepository callbackRepository;
     private final UserNodeRepository userNodeRepository;
+    private final CharacterRepository characterRepository;
     private final UserRepository userRepository;
-
-    @Value("${app.base-url:https://api.rootale.com}")
-    private String baseUrl;
+    private final WebClient llmWebClient;
+    private final WebClient ttsWebClient;
+    private final WebClient imageWebClient;
+    private final UniverseRepository universeRepository;
+    private final ObjectMapper objectMapper;
 
     /**
-     * 유저 메시지 전송 및 AI 응답 생성
+     * 유저 메시지 전송 및 AI 응답 스트림 생성
+     * LLM에서 받은 토큰 스트림을 반환합니다. 모든 DB 블로킹 작업은 별도의 스레드에서 수행됩니다.
      */
     @Transactional
-    public NarrativeDto.SendMessageResponse sendMessage(
+    public Flux<String> sendMessageAndStream(
             Long userId,
             String sessionId,
             NarrativeDto.SendMessageRequest request
     ) {
-        // 1. 유저 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+        // 1. 초기 DB 작업 - User와 LLM Request를 함께(context) 반환
+        Mono<LlmDto.MessageContext> initialDbWork = Mono.fromCallable(() -> {
+            // 1-1. 유저 조회
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
-        // 2. 세션 검증 (Neo4j)
-        UserNode userNode = userNodeRepository.findByUserId(userId.intValue())
-                .orElseThrow(() -> new ResourceNotFoundException("UserNode not found: " + userId));
+            // 1-2. 세션 검증 (Neo4j)
+            UserNode userNode = userNodeRepository.findByUserId(userId.intValue())
+                    .orElseThrow(() -> new ResourceNotFoundException("UserNode not found: " + userId));
 
-        PlayRelationship session = userNode.getPlayRelationships().stream()
-                .filter(play -> play.getId().equals(sessionId))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
+            userNode.getPlayRelationships().stream()
+                    .filter(play -> play.getId().equals(sessionId))
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException("Session not found: " + sessionId));
 
-        // 3. 유저 메시지 저장
-        NarrativeMessage userMessage = NarrativeMessage.builder()
-                .sessionId(sessionId)
-                .role("user")
-                .content(request.message())
-                .user(user)
-                .build();
-        messageRepository.save(userMessage);
+            // 1-3. Universe & Character 조회
+            Universe universe = universeRepository.findUniverseBySessionId(userId, sessionId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Universe not found:" + sessionId));
 
-        // 4. AI 응답 생성 (현재는 단순 텍스트, 향후 Gemini API 연동)
-        String aiResponseText = generateAiResponse(session, request.message());
+            Character character = characterRepository.findInteractingCharactersByUniverseId(userId, universe.getUniverseId());
 
-        // 5. AI 응답 메시지 저장
-        NarrativeMessage assistantMessage = NarrativeMessage.builder()
-                .sessionId(sessionId)
-                .role("assistant")
-                .content(aiResponseText)
-                .user(user)
-                .build();
-        messageRepository.save(assistantMessage);
+            // 1-4. Chat History 조회
+            Pageable pageable = PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "createdAt"));
+            Page<NarrativeMessage> chatHistory = messageRepository.findBySessionIdOrderByCreatedAtDesc(sessionId, pageable);
 
-        // 6. 이미지 생성 콜백 생성 (비동기)
-        ImageGenerationCallback callback = ImageGenerationCallback.builder()
-                .sessionId(sessionId)
-                .messageId(assistantMessage.getId())
-                .status("pending")
-                .user(user)
-                .build();
-        callbackRepository.save(callback);
+            // 1-5. LLM Request DTO 생성 (User 객체 포함)
+            LlmDto.Request llmRequest = LlmDto.buildLlmRequestDto(
+                    user, universe, character, chatHistory, request.message());
 
-        // 7. 비동기로 이미지 생성 시작
-        generateImageAsync(callback.getCallbackId(), aiResponseText);
+            // 1-6. 유저 메시지 저장
+            NarrativeMessage userMessage = NarrativeMessage.builder()
+                    .sessionId(sessionId)
+                    .role("user")
+                    .content(request.message())
+                    .user(user)
+                    .build();
+            messageRepository.save(userMessage);
+            log.info("User message saved. SessionId: {}, UserId: {}", sessionId, userId);
 
-        // 8. 응답 반환
-        return NarrativeDto.SendMessageResponse.builder()
-                .text(aiResponseText)
-                .textCallbackUrl(null)  // 텍스트는 즉시 반환
-                .imageCallbackUrl(baseUrl + "/narrative/callback/image/" + callback.getCallbackId())
-                .build();
+            return LlmDto.MessageContext.builder()
+                    .user(user)
+                    .llmRequest(llmRequest)
+                    .build();
+
+        }).subscribeOn(Schedulers.boundedElastic());
+
+        // 2. LLM RunPod API 호출 파이프라인
+        return initialDbWork.flatMapMany(context -> {
+
+            // 2-1. /run API 호출: job ID 획득
+            Mono<String> jobIdMono = callRunApi(context.llmRequest())
+                    .map(LlmDto.RunResponse::id)
+                    .doOnSuccess(jobId -> log.info("Job created. JobId: {}", jobId));
+
+            // 2-2. Job ID를 받아 스트리밍 및 최종 저장 로직 실행
+            return jobIdMono.flatMapMany(jobId -> {
+                StringBuilder llmResponseContent = new StringBuilder();
+
+                // 2-3. 최종 저장을 위한 메시지 엔티티 준비 (User 객체 사용 가능!)
+                NarrativeMessage assistantMessage = NarrativeMessage.builder()
+                        .sessionId(sessionId)
+                        .role("assistant")
+                        .user(context.user()) // ✅ Context에서 User 객체 사용
+                        .build();
+
+                // 2-4. Stream API 호출 (토큰 스트림 획득)
+                Flux<String> llmTokenStream = callStreamApi(jobId)
+                        .doOnNext(token -> {
+                            llmResponseContent.append(token);
+                            log.debug("Token received: {}", token);
+                        })
+                        // 2-5. Stream 완료 시 최종 Status API 호출 및 DB 저장
+                        .doOnComplete(() -> {
+                            // 블로킹 작업을 백그라운드 스레드에서 실행
+                            Mono.fromRunnable(() -> {
+                                try {
+                                    // Status API 동기 호출
+                                    LlmDto.StatusResponse statusResponse = callStatusApi(jobId)
+                                            .block();
+
+                                    if (statusResponse != null) {
+                                        // 최종 메시지를 DB에 저장
+                                        assistantMessage.setContent(statusResponse.characterMessage());
+                                        assistantMessage.setDescription(statusResponse.narrative());
+                                        messageRepository.save(assistantMessage);
+                                        log.info("AI message saved. SessionId: {}, JobId: {}", sessionId, jobId);
+                                    } else {
+                                        log.error("Status response is null. JobId: {}", jobId);
+                                    }
+                                } catch (Exception e) {
+                                    log.error("Failed to save AI message. JobId: {}, Error: {}", jobId, e.getMessage(), e);
+                                }
+                            }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                        })
+                        // 2-6. 에러 처리
+                        .doOnError(error -> {
+                            log.error("Stream error occurred. JobId: {}, Error: {}", jobId, error.getMessage(), error);
+                            // 에러 발생 시에도 부분 메시지 저장 (선택사항)
+                            Mono.fromRunnable(() -> {
+                                try {
+                                    assistantMessage.setContent("[Error: " + error.getMessage() + "]");
+                                    assistantMessage.setDescription("Stream interrupted");
+                                    messageRepository.save(assistantMessage);
+                                } catch (Exception e) {
+                                    log.error("Failed to save error message", e);
+                                }
+                            }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+                        });
+
+                return llmTokenStream;
+            });
+        });
     }
 
     /**
@@ -197,18 +272,77 @@ public class NarrativeService {
 
     // ===== Helper Methods =====
 
-    /**
-     * AI 응답 생성 (현재는 Mock, 향후 Gemini API 연동)
-     */
-    private String generateAiResponse(PlayRelationship session, String userMessage) {
-        // TODO: Gemini API 연동
-        // 1. 세션 컨텍스트 수집 (캐릭터, 현재 노드, 방문한 노드)
-        // 2. 벡터 DB에서 장기기억 검색
-        // 3. Gemini API 호출
-        // 4. 응답 생성
+    // Run API 호출: Job ID 획득
+    private Mono<LlmDto.RunResponse> callRunApi(LlmDto.Request requestDto) {
+        return llmWebClient.post()
+                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/run")
+                .bodyValue(requestDto)
+                .retrieve()
+                .bodyToMono(LlmDto.RunResponse.class)
+                .timeout(Duration.ofSeconds(30))
+                .doOnSuccess(response -> log.info("Run API success. JobId: {}", response.id()));
+    }
 
-        return "안녕하세요! 저는 " + session.getUniverse().getName() + "의 안내자입니다. " +
-                "당신의 메시지: \"" + userMessage + "\"를 잘 받았습니다.";
+    // Stream API 호출: 토큰 스트림 획득
+    private Flux<String> callStreamApi(String jobId) {
+        // RunPod의 Stream API가 JSON Lines를 보낸다고 가정하고 파싱 로직을 추가합니다.
+
+        return llmWebClient.get()
+                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/stream/{id}", jobId)
+                .retrieve()
+                // RunPod API가 SSE 표준 대신 JSON Lines를 보내므로 String으로 수신
+                .bodyToFlux(String.class)
+                .flatMap(jsonToken -> {
+                    return parseAndExtractTokens(jsonToken);
+                })
+                .timeout(Duration.ofMinutes(5))
+                .doOnComplete(() -> log.info("Stream completed for JobId: {}", jobId))
+                .doOnError(e -> System.err.println("스트림 파싱 중 오류 발생: " + e.getMessage()));
+    }
+
+    /**
+     * JSON 응답 문자열을 파싱하여 'stream' 배열에서 토큰만 추출합니다.
+     * @param jsonString RunPod API에서 수신한 단일 JSON 응답 문자열
+     * @return 추출된 토큰 문자열 Flux
+     */
+    private Flux<String> parseAndExtractTokens(String jsonString) {
+        try {
+            // 1. JSON String을 JsonNode로 파싱합니다.
+            JsonNode rootNode = objectMapper.readTree(jsonString);
+
+            // 2. 'stream' 필드가 존재하는지 확인합니다.
+            if (rootNode.has("stream") && rootNode.get("stream").isArray()) {
+                JsonNode streamNode = rootNode.get("stream");
+
+                // 3. 'stream' 배열을 순회하며 각 토큰(문자열)을 추출합니다.
+                return Flux.fromIterable(streamNode)
+                        .map(JsonNode::asText); // JsonNode를 String으로 변환하여 반환
+            }
+
+            // 4. (선택적) 상태 확인: 작업 완료(COMPLETED) 상태는 스트림의 끝을 나타낼 수 있습니다.
+            if (rootNode.has("status") && "COMPLETED".equals(rootNode.get("status").asText())) {
+                System.out.println("스트림이 COMPLETED 상태로 종료되었습니다.");
+                return Flux.empty(); // 스트림 종료
+            }
+
+            // 'stream' 필드가 없거나 배열이 아닌 경우, 유효하지 않은 응답으로 간주하고 비어있는 Flux를 반환
+            return Flux.empty();
+
+        } catch (Exception e) {
+            // 파싱 오류가 발생하면 에러를 출력하고 해당 토큰은 무시 (또는 에러 전달)
+            System.err.println("JSON 파싱 오류: " + e.getMessage() + " (JSON: " + jsonString.substring(0, Math.min(100, jsonString.length())) + "...)");
+            return Flux.empty(); // 오류 발생 시 해당 항목은 건너뜁니다.
+        }
+    }
+
+    // Status API 호출: 최종 DB 저장 정보 획득
+    // doOnTerminate에서 블로킹이 허용되므로 Mono<StatusResponse>를 block()으로 동기 처리합니다.
+    private Mono<LlmDto.StatusResponse> callStatusApi(String jobId) {
+        return llmWebClient.get()
+                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/status/{id}", jobId)
+                .retrieve()
+                .bodyToMono(LlmDto.StatusResponse.class)
+                .timeout(Duration.ofSeconds(30)); // Status DTO에 맞춰 수신
     }
 
     /**
