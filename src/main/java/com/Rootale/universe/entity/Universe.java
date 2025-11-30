@@ -18,9 +18,10 @@ public class Universe {
 
     @Id
     @GeneratedValue(generatorClass = UUIDStringGenerator.class)
+    @Property("universe_id")
     private String universeId;
 
-    @Property("name")
+    @Property("title") //name
     private String name;
 
     @Property("story")
