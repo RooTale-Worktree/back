@@ -14,8 +14,14 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.UUID;
 
@@ -27,6 +33,7 @@ import java.util.UUID;
 public class NarrativeController {
 
     private final NarrativeService narrativeService;
+    private final Logger logger = LoggerFactory.getLogger(NarrativeController.class);
 
     @PostMapping("/{sessionId}/messages")
     @Operation(
@@ -39,17 +46,43 @@ public class NarrativeController {
                     @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자")
             }
     )
-    public ResponseEntity<NarrativeDto.SendMessageResponse> sendMessage(
+    public Flux<ServerSentEvent<String>> sendMessageAndStream(
             @AuthenticationPrincipal CustomUser user,
             @Parameter(description = "세션 ID") @PathVariable String sessionId,
             @Valid @RequestBody NarrativeDto.SendMessageRequest request
     ) {
-        NarrativeDto.SendMessageResponse response = narrativeService.sendMessage(
+        Flux<String> tokenStream = narrativeService.sendMessageAndStream(
                 user.getUserId(),
                 sessionId,
                 request
         );
-        return ResponseEntity.ok(response);
+
+        // 토큰 스트림을 SSE Event 형식으로 변환합니다.
+        Flux<ServerSentEvent<String>> sseTokenFlux = tokenStream
+                .map(token -> ServerSentEvent.<String>builder()
+                        .data(token)
+                        .id(String.valueOf(System.currentTimeMillis()))
+                        .build());
+
+        // 클라이언트가 식별하기 위한 종료 이벤트를 생성합니다.
+        Mono<ServerSentEvent<String>> doneEventMono = Mono.just(
+                ServerSentEvent.<String>builder()
+                        .event("done") // 이벤트 이름: done
+                        .data("")      // 빈 데이터 or 최종 상태 데이터
+                        .id("final")
+                        .build()
+        );
+
+        // 토큰 스트림 뒤에 종료 이벤트를 붙여서 반환합니다.
+        // Flux.concat()은 sseTokenFlux가 ON_COMPLETE 시그널을 발행할 때까지 기다렸다가
+        // doneEventMono의 이벤트를 발행하고, 최종적으로 스트림을 닫습니다.
+        return Flux.concat(sseTokenFlux, doneEventMono)
+                // 5. 로깅을 위한 doFinally는 유지 (필수 아님)
+                .doFinally(signalType -> {
+                    if (signalType.equals(reactor.core.publisher.SignalType.ON_COMPLETE)) {
+                        logger.info("스트리밍 완료 및 연결 종료 (DONE 이벤트 전송됨)");
+                    }
+                });
     }
 
     @GetMapping("/callback/image/{callbackId}")
