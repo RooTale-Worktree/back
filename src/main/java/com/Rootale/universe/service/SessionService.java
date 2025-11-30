@@ -61,7 +61,8 @@ public class SessionService {  // ⭐ @Transactional 제거
                     .characterId(request.characterId())
                     .sessionName(universe.getName())
                     .progress(0.0f)
-                    .lastReadNodeId(universe.getStartScene() != null ? universe.getStartScene().getNodeId() : null)
+//                    .lastReadNodeId(universe.getStartScene() != null ? universe.getStartScene().getNodeId() : null)
+                    .lastReadNodeId(null)
                     .createdAt(LocalDateTime.now())
                     .updatedAt(LocalDateTime.now())
                     .build();
@@ -80,9 +81,10 @@ public class SessionService {  // ⭐ @Transactional 제거
 
             // 7. 첫 메시지 및 이미지 생성
             String firstMessage = generateFirstMessage(character, universe);
-            String firstImage = universe.getStartScene() != null && universe.getStartScene().getNodeId() != null
-                    ? generateSceneImage(universe.getStartScene().getNodeId())
-                    : universe.getRepresentativeImage();
+//            String firstImage = universe.getStartScene() != null && universe.getStartScene().getNodeId() != null
+//                    ? generateSceneImage(universe.getStartScene().getNodeId())
+//                    : universe.getRepresentativeImage();
+            String firstImage = universe.getRepresentativeImage();
 
             log.info("✅ Session created successfully");
             return SessionDto.CreateSessionResponse.builder()

@@ -21,7 +21,7 @@ public class Universe {
     @Property("universe_id")
     private String universeId;
 
-    @Property("title") //name
+    @Property("name") //name
     private String name;
 
     @Property("story")
@@ -45,11 +45,11 @@ public class Universe {
     @Property("updated_at")
     private LocalDateTime updatedAt;
 
-    @Relationship(type = "HAS_START", direction = Relationship.Direction.OUTGOING)
-    private Scene startScene;
-
-    @Relationship(type = "HAS_CHARACTER", direction = Relationship.Direction.OUTGOING)
-    @Builder.Default
-    private List<Character> characters = new ArrayList<>();
+//    @Relationship(type = "HAS_START", direction = Relationship.Direction.OUTGOING)
+//    private Scene startScene;
+//
+//    @Relationship(type = "HAS_CHARACTER", direction = Relationship.Direction.OUTGOING)
+//    @Builder.Default
+//    private List<Character> characters = new ArrayList<>();
 
 }

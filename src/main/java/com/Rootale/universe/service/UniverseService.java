@@ -4,6 +4,7 @@ import com.Rootale.universe.dto.UniverseDto;
 import com.Rootale.universe.entity.Character;
 import com.Rootale.universe.entity.Universe;
 import com.Rootale.universe.repository.CharacterRepository;
+import com.Rootale.universe.repository.UniverseCustomRepository;
 import com.Rootale.universe.repository.UniverseRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,7 @@ import java.util.stream.Collectors;
 public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
 
     private final UniverseRepository universeRepository;
+    private final UniverseCustomRepository universeCustomRepository;  // ⭐ 추가
     private final CharacterRepository characterRepository;
 
     /**
@@ -28,7 +30,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     public UniverseDto.UniverseListResponse getAllUniverses() {
         try {
             log.info("📋 Fetching all universes");
-            List<Universe> universes = universeRepository.findAllUniverses();
+            List<Universe> universes = universeCustomRepository.findAllUniverses();  // ⭐ 변경
             log.info("✅ Found {} universes", universes.size());
 
             List<UniverseDto.UniverseSummary> summaries = universes.stream()
@@ -42,14 +44,13 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
         }
     }
 
-
     /**
      * 특정 세계관 상세 조회
      */
     public UniverseDto.UniverseDetailResponse getUniverseById(String universeId) {
         try {
             log.info("📋 Fetching universe: {}", universeId);
-            Universe universe = universeRepository.findById(universeId)
+            Universe universe = universeCustomRepository.findByUniverseId(universeId)  // ⭐ 변경
                     .orElseThrow(() -> new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId));
 
             log.info("✅ Found universe: {}", universe.getName());
@@ -67,7 +68,8 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
         try {
             log.info("📋 Fetching characters for universe: {}", universeId);
 
-            if (!universeRepository.existsById(universeId)) {
+            // ⭐ 존재 확인도 커스텀 메서드 사용
+            if (universeCustomRepository.findByUniverseId(universeId).isEmpty()) {
                 throw new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId);
             }
 
@@ -84,7 +86,6 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             throw e;
         }
     }
-
     // ===== Mapper methods =====
 
     private UniverseDto.UniverseSummary toUniverseSummary(Universe universe) {
