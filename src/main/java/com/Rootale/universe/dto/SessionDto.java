@@ -2,6 +2,7 @@
 package com.Rootale.universe.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 
@@ -18,25 +19,30 @@ public class SessionDto {
      */
     @Builder
     public record CreateSessionRequest(
+            @Schema(
+                    description = "세계관 ID",
+                    example = "d16a682c-0b40-44cc-a328-935ffc31aa1e"
+            )
             @JsonProperty("universe_id")
             @NotBlank(message = "universe_id는 필수입니다")
             String universeId,
 
+            @Schema(
+                    description = "세계관 ID",
+                    example = "aae260b0-7700-4199-88f4-8ea8360d3deb"
+            )
             @JsonProperty("character_id")
             @NotBlank(message = "character_id는 필수입니다")
             String characterId
     ) {}
 
     /**
-     * POST /session 응답
+     * POST /session 응답 - 세션 목록 반환
      */
     @Builder
     public record CreateSessionResponse(
-            @JsonProperty("first_message")
-            String firstMessage,
-
-            @JsonProperty("first_image")
-            String firstImage
+            List<SessionInfo> sessions,
+            Integer total
     ) {}
 
     /**
@@ -45,7 +51,7 @@ public class SessionDto {
     @Builder
     public record SessionInfo(
             @JsonProperty("session_id")
-            Long sessionId,
+            String sessionId,  // ⭐ Long → String으로 변경 (UUID 형식)
 
             @JsonProperty("session_name")
             String sessionName,
@@ -57,10 +63,10 @@ public class SessionDto {
             String representativeImage,
 
             @JsonProperty("created_at")
-            Instant createdAt,
+            String createdAt,  // ⭐ ISO 8601 형식 문자열
 
             @JsonProperty("updated_at")
-            Instant updatedAt
+            String updatedAt   // ⭐ ISO 8601 형식 문자열
     ) {}
 
     /**

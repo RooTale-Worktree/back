@@ -14,8 +14,8 @@ import jakarta.persistence.EntityManagerFactory;
 @EnableJpaRepositories(
         basePackages = {
                 "com.Rootale.member.repository",  // User, OAuthAccount 등
-                "com.Rootale.fcm.repository",     // ⭐ FCM Repository 추가
-                "com.Rootale.topic.repository"    // ⭐ Topic Repository 추가 (있다면)
+                "com.Rootale.fcm.repository",
+                "com.Rootale.topic.repository"
         },
         transactionManagerRef = "jpaTransactionManager"
 )
