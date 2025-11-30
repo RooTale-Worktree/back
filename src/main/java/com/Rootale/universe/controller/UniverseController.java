@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -77,6 +78,27 @@ public class UniverseController {
         }
 
         UniverseDto.CharacterListResponse response = universeService.getCharactersByUniverseId(universeId);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping
+    @Operation(summary = "새로운 세계관 생성", description = "새로운 세계관을 생성합니다")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "생성 성공"),
+            @ApiResponse(responseCode = "400", description = "잘못된 요청",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))),
+            @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<UniverseDto.CreateUniverseResponse> createUniverse(
+            @Valid @RequestBody UniverseDto.CreateUniverseRequest request,
+            Authentication authentication) {
+
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+
+        UniverseDto.CreateUniverseResponse response = universeService.createUniverse(request);
         return ResponseEntity.ok(response);
     }
 }
