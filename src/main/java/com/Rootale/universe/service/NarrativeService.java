@@ -17,12 +17,16 @@ import com.Rootale.universe.repository.UniverseRepository;
 import com.Rootale.universe.repository.UserNodeRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +60,7 @@ public class NarrativeService {
     /**
      * 유저 메시지 전송 및 AI 응답 스트림 생성
      * LLM에서 받은 토큰 스트림을 반환합니다. 모든 DB 블로킹 작업은 별도의 스레드에서 수행됩니다.
+     * 프론트에서 토큰 스트림만 요구할 시, 따로 추가적인 ResponseDto는 필요 없습니다.
      */
     @Transactional
     public Flux<String> sendMessageAndStream(
@@ -106,74 +111,40 @@ public class NarrativeService {
                     .user(user)
                     .llmRequest(llmRequest)
                     .build();
-
         }).subscribeOn(Schedulers.boundedElastic());
 
-        // 2. LLM RunPod API 호출 파이프라인
+        // 2. LLM API 호출 파이프라인
         return initialDbWork.flatMapMany(context -> {
+            // 2-1. 집계용 객체(Aggregator) 생성
+            // 스트림이 흐르는 동안 조각난 데이터를 모을 객체
+            StreamAggregator aggregator = new StreamAggregator(sessionId, context.user());
 
-            // 2-1. /run API 호출: job ID 획득
-            Mono<String> jobIdMono = callRunApi(context.llmRequest())
-                    .map(LlmDto.RunResponse::id)
-                    .doOnSuccess(jobId -> log.info("Job created. JobId: {}", jobId));
-
-            // 2-2. Job ID를 받아 스트리밍 및 최종 저장 로직 실행
-            return jobIdMono.flatMapMany(jobId -> {
-                StringBuilder llmResponseContent = new StringBuilder();
-
-                // 2-3. 최종 저장을 위한 메시지 엔티티 준비 (User 객체 사용 가능!)
-                NarrativeMessage assistantMessage = NarrativeMessage.builder()
-                        .sessionId(sessionId)
-                        .role("assistant")
-                        .user(context.user()) // ✅ Context에서 User 객체 사용
-                        .build();
-
-                // 2-4. Stream API 호출 (토큰 스트림 획득)
-                Flux<String> llmTokenStream = callStreamApi(jobId)
-                        .doOnNext(token -> {
-                            llmResponseContent.append(token);
-                            log.debug("Token received: {}", token);
-                        })
-                        // 2-5. Stream 완료 시 최종 Status API 호출 및 DB 저장
-                        .doOnComplete(() -> {
-                            // 블로킹 작업을 백그라운드 스레드에서 실행
-                            Mono.fromRunnable(() -> {
-                                try {
-                                    // Status API 동기 호출
-                                    LlmDto.StatusResponse statusResponse = callStatusApi(jobId)
-                                            .block();
-
-                                    if (statusResponse != null) {
-                                        // 최종 메시지를 DB에 저장
-                                        assistantMessage.setContent(statusResponse.characterMessage());
-                                        assistantMessage.setDescription(statusResponse.narrative());
-                                        messageRepository.save(assistantMessage);
-                                        log.info("AI message saved. SessionId: {}, JobId: {}", sessionId, jobId);
-                                    } else {
-                                        log.error("Status response is null. JobId: {}", jobId);
-                                    }
-                                } catch (Exception e) {
-                                    log.error("Failed to save AI message. JobId: {}, Error: {}", jobId, e.getMessage(), e);
-                                }
-                            }).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                        })
-                        // 2-6. 에러 처리
-                        .doOnError(error -> {
-                            log.error("Stream error occurred. JobId: {}, Error: {}", jobId, error.getMessage(), error);
-                            // 에러 발생 시에도 부분 메시지 저장 (선택사항)
-                            Mono.fromRunnable(() -> {
-                                try {
-                                    assistantMessage.setContent("[Error: " + error.getMessage() + "]");
-                                    assistantMessage.setDescription("Stream interrupted");
-                                    messageRepository.save(assistantMessage);
-                                } catch (Exception e) {
-                                    log.error("Failed to save error message", e);
-                                }
-                            }).subscribeOn(Schedulers.boundedElastic()).subscribe();
-                        });
-
-                return llmTokenStream;
-            });
+            // 2-2. FastAPI (/v1/chat) 호출
+            return llmWebClient.post()
+                    .uri("/v1/chat") // 파이썬 서버 엔드포인트
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.TEXT_EVENT_STREAM) // SSE 수신 명시
+                    .bodyValue(context.llmRequest())
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    // 2-3. SSE 포맷 파싱 및 집계 (Side Effect)
+                    .doOnNext(line -> {
+                        // 실제 데이터 파싱 및 aggregator에 누적
+                        parseAndAggregate(line, aggregator);
+                    })
+                    .filter(line -> line != null && !line.trim().isEmpty() && !line.contains("[DONE]"))
+                    // 2-4. "data: " 접두사 제거 (순수 JSON만 남김). 아니면 service랑 controller에서 2번 랩핑하게 되버림
+                    .map(line -> line.substring(5).trim())
+                    // 2-5. 스트림 완료 시 DB 저장 (Side Effect)
+                    .doOnComplete(() -> {
+                        saveAggregatedMessage(aggregator);
+                    })
+                    // 2-6. 에러 처리
+                    .doOnError(e -> {
+                        log.error("Streaming error: {}", e.getMessage());
+                        saveErrorMessage(aggregator, e.getMessage());
+                    });
+            // 참고: 리턴되는 Flux<String>은 프론트엔드로 그대로 흘러갑니다.
         });
     }
 
@@ -270,79 +241,123 @@ public class NarrativeService {
                 .build();
     }
 
-    // ===== Helper Methods =====
-
-    // Run API 호출: Job ID 획득
-    private Mono<LlmDto.RunResponse> callRunApi(LlmDto.Request requestDto) {
-        return llmWebClient.post()
-                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/run")
-                .bodyValue(requestDto)
-                .retrieve()
-                .bodyToMono(LlmDto.RunResponse.class)
-                .timeout(Duration.ofSeconds(30))
-                .doOnSuccess(response -> log.info("Run API success. JobId: {}", response.id()));
-    }
-
-    // Stream API 호출: 토큰 스트림 획득
-    private Flux<String> callStreamApi(String jobId) {
-        // RunPod의 Stream API가 JSON Lines를 보낸다고 가정하고 파싱 로직을 추가합니다.
-
-        return llmWebClient.get()
-                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/stream/{id}", jobId)
-                .retrieve()
-                // RunPod API가 SSE 표준 대신 JSON Lines를 보내므로 String으로 수신
-                .bodyToFlux(String.class)
-                .flatMap(jsonToken -> {
-                    return parseAndExtractTokens(jsonToken);
-                })
-                .timeout(Duration.ofMinutes(5))
-                .doOnComplete(() -> log.info("Stream completed for JobId: {}", jobId))
-                .doOnError(e -> System.err.println("스트림 파싱 중 오류 발생: " + e.getMessage()));
-    }
-
+    // ===== Helper Methods & Class =====
     /**
-     * JSON 응답 문자열을 파싱하여 'stream' 배열에서 토큰만 추출합니다.
-     * @param jsonString RunPod API에서 수신한 단일 JSON 응답 문자열
-     * @return 추출된 토큰 문자열 Flux
+     * 들어오는 SSE 라인("data: {...}")을 파싱하여 Aggregator에 누적
      */
-    private Flux<String> parseAndExtractTokens(String jsonString) {
+    private void parseAndAggregate(String line, StreamAggregator aggregator) {
+        if (line == null || !line.startsWith("data:")) {
+            return; // SSE 데이터가 아니면 무시
+        }
+
+        String jsonStr = line.substring(5).trim(); // "data:" 제거
+        if ("[DONE]".equals(jsonStr)) return; // 종료 신호 무시
+
         try {
-            // 1. JSON String을 JsonNode로 파싱합니다.
-            JsonNode rootNode = objectMapper.readTree(jsonString);
+            JsonNode root = objectMapper.readTree(jsonStr);
+            JsonNode choices = root.path("choices");
+            if (choices.isMissingNode() || choices.isEmpty()) return;
 
-            // 2. 'stream' 필드가 존재하는지 확인합니다.
-            if (rootNode.has("stream") && rootNode.get("stream").isArray()) {
-                JsonNode streamNode = rootNode.get("stream");
+            JsonNode delta = choices.get(0).path("delta");
 
-                // 3. 'stream' 배열을 순회하며 각 토큰(문자열)을 추출합니다.
-                return Flux.fromIterable(streamNode)
-                        .map(JsonNode::asText); // JsonNode를 String으로 변환하여 반환
+            // 1. 텍스트 데이터 Append (이어붙이기)
+            if (delta.has("character_message")) {
+                aggregator.appendCharacterMessage(delta.get("character_message").asText());
+            }
+            if (delta.has("narrative")) {
+                aggregator.appendNarrative(delta.get("narrative").asText());
             }
 
-            // 4. (선택적) 상태 확인: 작업 완료(COMPLETED) 상태는 스트림의 끝을 나타낼 수 있습니다.
-            if (rootNode.has("status") && "COMPLETED".equals(rootNode.get("status").asText())) {
-                System.out.println("스트림이 COMPLETED 상태로 종료되었습니다.");
-                return Flux.empty(); // 스트림 종료
+            // 2. 메타데이터 Update (덮어쓰기/설정) - 시간 차가 있으나 주로 마지막 청크에 올 것임
+            if (delta.has("image_prompt")) {
+                aggregator.setImagePrompt(delta.get("image_prompt").asText());
             }
-
-            // 'stream' 필드가 없거나 배열이 아닌 경우, 유효하지 않은 응답으로 간주하고 비어있는 Flux를 반환
-            return Flux.empty();
+            if (delta.has("usage")) {
+                aggregator.setUsage(delta.get("usage")); // JsonNode 그대로 저장하거나 DTO 매핑
+            }
+            if (delta.has("timing")) {
+                aggregator.setTiming(delta.get("timing"));
+            }
+            /**
+             * ToDo: next_state_description 받기
+             * 그런데 매 대화마다 다음 스토리 노드로 넘어가는 건 아니라서 이 부분은 추후 얘기 나눠봐야할 듯
+             */
 
         } catch (Exception e) {
-            // 파싱 오류가 발생하면 에러를 출력하고 해당 토큰은 무시 (또는 에러 전달)
-            System.err.println("JSON 파싱 오류: " + e.getMessage() + " (JSON: " + jsonString.substring(0, Math.min(100, jsonString.length())) + "...)");
-            return Flux.empty(); // 오류 발생 시 해당 항목은 건너뜁니다.
+            log.warn("JSON Parse Error for line: {}", line, e);
         }
     }
 
-    // Status API 호출: 최종 DB 저장 정보 획득
-    // doOnTerminate에서 블로킹이 허용되므로 Mono<StatusResponse>를 block()으로 동기 처리합니다.
-    private Mono<LlmDto.StatusResponse> callStatusApi(String jobId) {
-        return llmWebClient.get()
-                .uri("https://api.runpod.ai/v2/lgqj24q6hfg9sr/status/{id}", jobId)
-                .retrieve()
-                .bodyToMono(LlmDto.StatusResponse.class)
-                .timeout(Duration.ofSeconds(30)); // Status DTO에 맞춰 수신
+    /**
+     * 스트림 종료 후 모아진 데이터를 DB에 저장
+     */
+    private void saveAggregatedMessage(StreamAggregator aggregator) {
+        Mono.fromRunnable(() -> {
+            try {
+                // 완성된 텍스트와 메타데이터로 엔티티 생성
+                NarrativeMessage aiMessage = NarrativeMessage.builder()
+                        .sessionId(aggregator.getSessionId())
+                        .role("assistant")
+                        .user(aggregator.getUser())
+                        .content(aggregator.getFullCharacterMessage()) // 완성된 대사
+                        .description(aggregator.getFullNarrative())    // 완성된 서사
+                        // .meta(aggregator.getUsage().toString()) // 필요시 메타데이터 저장
+                        .build();
+
+                messageRepository.save(aiMessage);
+                log.info("AI Message saved successfully. SessionId: {}", aggregator.getSessionId());
+            } catch (Exception e) {
+                log.error("Failed to save AI message", e);
+            }
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe(); // 비동기 실행 (Fire & Forget)
+    }
+
+    private void saveErrorMessage(StreamAggregator aggregator, String errorMsg) {
+        Mono.fromRunnable(() -> {
+            NarrativeMessage errorMessage = NarrativeMessage.builder()
+                    .sessionId(aggregator.getSessionId())
+                    .role("assistant")
+                    .user(aggregator.getUser())
+                    .content("[Error]")
+                    .description("Error occurred during generation: " + errorMsg)
+                    .build();
+            messageRepository.save(errorMessage);
+        }).subscribeOn(Schedulers.boundedElastic()).subscribe();
+    }
+
+    // =================================================================
+    // Inner Class: Aggregator (상태 관리용)
+    // =================================================================
+    @Getter
+    @Setter
+    @RequiredArgsConstructor
+    @ToString // 디버깅용
+    private static class StreamAggregator {
+        private final String sessionId;
+        private final User user;
+
+        private StringBuilder characterMessageBuilder = new StringBuilder();
+        private StringBuilder narrativeBuilder = new StringBuilder();
+
+        private String imagePrompt;
+        private JsonNode usage;
+        private JsonNode timing;
+
+        public void appendCharacterMessage(String text) {
+            if (text != null) characterMessageBuilder.append(text);
+        }
+
+        public void appendNarrative(String text) {
+            if (text != null) narrativeBuilder.append(text);
+        }
+
+        public String getFullCharacterMessage() {
+            return characterMessageBuilder.toString();
+        }
+
+        public String getFullNarrative() {
+            return narrativeBuilder.toString();
+        }
     }
 
     /**

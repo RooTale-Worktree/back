@@ -13,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,7 +36,7 @@ public class NarrativeController {
     private final NarrativeService narrativeService;
     private final Logger logger = LoggerFactory.getLogger(NarrativeController.class);
 
-    @PostMapping("/{sessionId}/messages")
+    @PostMapping(value = "/{sessionId}/messages", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(
             summary = "메시지 전송",
             description = "유저 메시지를 전송하고 AI 응답을 생성합니다. 이미지는 비동기로 생성되며 콜백 URL을 통해 폴링할 수 있습니다.",
@@ -68,21 +69,14 @@ public class NarrativeController {
         Mono<ServerSentEvent<String>> doneEventMono = Mono.just(
                 ServerSentEvent.<String>builder()
                         .event("done") // 이벤트 이름: done
-                        .data("")      // 빈 데이터 or 최종 상태 데이터
+                        .data("Stream Finished")
                         .id("final")
                         .build()
         );
 
         // 토큰 스트림 뒤에 종료 이벤트를 붙여서 반환합니다.
-        // Flux.concat()은 sseTokenFlux가 ON_COMPLETE 시그널을 발행할 때까지 기다렸다가
-        // doneEventMono의 이벤트를 발행하고, 최종적으로 스트림을 닫습니다.
         return Flux.concat(sseTokenFlux, doneEventMono)
-                // 5. 로깅을 위한 doFinally는 유지 (필수 아님)
-                .doFinally(signalType -> {
-                    if (signalType.equals(reactor.core.publisher.SignalType.ON_COMPLETE)) {
-                        logger.info("스트리밍 완료 및 연결 종료 (DONE 이벤트 전송됨)");
-                    }
-                });
+                .doFinally(signalType -> logger.info("Session {} Stream Closed", sessionId));
     }
 
     @GetMapping("/callback/image/{callbackId}")
