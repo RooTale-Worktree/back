@@ -49,6 +49,29 @@ public class UniverseDto {
     ) {}
 
     /**
+     * 세계관 수정 요청
+     */
+    public record UpdateUniverseRequest(
+            @Size(max = 255, message = "이름은 255자를 초과할 수 없습니다")
+            String name,
+
+            @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
+            String description,
+
+            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
+            String story,
+
+            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
+            String canon,
+
+            @JsonProperty("representative_image")
+            String representativeImage,
+
+            @JsonProperty("estimated_play_time")
+            Integer estimatedPlayTime
+    ) {}
+
+    /**
      * 세계관 목록 응답
      */
     public record UniverseListResponse(
@@ -98,5 +121,14 @@ public class UniverseDto {
             String description,
             @JsonProperty("avatar_url") String avatarUrl,
             String personality
+    ) {}
+
+
+    /**
+     * 이미지 업로드 응답
+     */
+    public record ImageUploadResponse(
+            @JsonProperty("s3_key") String s3Key,
+            @JsonProperty("presigned_url") String presignedUrl
     ) {}
 }

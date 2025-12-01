@@ -1,6 +1,11 @@
 package com.Rootale.s3;
 
 import com.Rootale.s3.dto.*;
+import com.Rootale.universe.dto.ErrorResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.Resource;
@@ -13,9 +18,10 @@ import java.io.IOException;
 import java.net.URL;
 import java.time.Duration;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/s3")
+@RequestMapping("/s3")
 @RequiredArgsConstructor
 @Validated
 public class S3Controller {
@@ -36,6 +42,35 @@ public class S3Controller {
 
         String safeKey = KeySanitizer.normalize(props.keyPrefix(), meta.key());
         s3FileService.upload(props.bucket(), safeKey, file);
+        return ResponseEntity.ok(ApiResponse.ok(new UploadResponse(safeKey)));
+    }
+
+    @PostMapping(value = "/upload-universe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "universe/image 업로드용", description = "img 업로드 후 key값 반환, universe.representative_image에 넣기")
+    @ApiResponses({
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "성공"),
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "InvalidAccess,SecretKey or IAM policy Miss",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
+    })
+    public ResponseEntity<ApiResponse<UploadResponse>> uploadSimple(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "prefix", required = false) String prefix
+    ) throws Exception {
+        if (file.getSize() <= 0) {
+            return ResponseEntity.badRequest().body(ApiResponse.error("빈 파일은 업로드할 수 없습니다."));
+        }
+        // 자동으로 키 생성
+        String filename = file.getOriginalFilename();
+        String extension = filename != null && filename.contains(".")
+                ? filename.substring(filename.lastIndexOf('.'))
+                : "";
+
+        String key = (prefix != null ? prefix : props.keyPrefix())
+                + UUID.randomUUID().toString() + extension;
+
+        String safeKey = KeySanitizer.normalize("", key);
+        s3FileService.upload(props.bucket(), safeKey, file);
+
         return ResponseEntity.ok(ApiResponse.ok(new UploadResponse(safeKey)));
     }
 
