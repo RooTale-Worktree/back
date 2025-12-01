@@ -103,6 +103,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             Universe universe = Universe.builder()
                     .name(request.name())
                     .description(request.description())
+                    .detailedDescription(request.detailedDescription())  // ⭐ 추가
                     .story(request.story())
                     .canon(request.canon())
                     .representativeImage(request.representativeImage())
@@ -139,6 +140,9 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             }
             if (request.description() != null) {
                 universe.setDescription(request.description());
+            }
+            if (request.detailedDescription() != null) {
+                universe.setDetailedDescription(request.detailedDescription());
             }
             if (request.story() != null) {
                 universe.setStory(request.story());
@@ -184,6 +188,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
                 universe.getUniverseId(),
                 universe.getName(),
                 universe.getDescription(),
+                universe.getDetailedDescription(),
                 generatePresignedUrl(universe.getRepresentativeImage()),
                 universe.getEstimatedPlayTime(),
                 universe.getCreatedAt(),
@@ -209,6 +214,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
                 universe.getUniverseId(),
                 universe.getName(),
                 universe.getDescription(),
+                universe.getDetailedDescription(),
                 universe.getStory(),
                 universe.getCanon(),
                 generatePresignedUrl(universe.getRepresentativeImage()),

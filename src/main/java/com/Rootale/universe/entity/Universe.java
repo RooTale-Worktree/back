@@ -33,6 +33,9 @@ public class Universe {
     @Property("description")
     private String description;
 
+    @Property("detailed_description")
+    private String detailedDescription;
+
     @Property("estimated_play_time")
     private Integer estimatedPlayTime;
 
