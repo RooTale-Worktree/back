@@ -3,6 +3,7 @@ package com.Rootale.universe.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import org.springframework.data.neo4j.core.schema.Property;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,6 +18,12 @@ public class UniverseDto {
             @Size(max = 255, message = "이름은 255자를 초과할 수 없습니다")
             String name,
 
+            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
+            String story,
+
+            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
+            String canon,
+
             @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
             String description,
 
@@ -24,34 +31,29 @@ public class UniverseDto {
             @Size(max = 5000, message = "상세 설명은 5000자를 초과할 수 없습니다")
             String detailedDescription,
 
-            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
-            String story,
-
-            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
-            String canon,
+            @JsonProperty("estimated_play_time")
+            Integer estimatedPlayTime,
 
             @JsonProperty("representative_image")
             String representativeImage,
 
-            @JsonProperty("estimated_play_time")
-            Integer estimatedPlayTime
+            @JsonProperty("setting")
+            String setting,  // 세계관 설정 전체 텍스트
+
+            @JsonProperty("protagonist_name")
+            String protagonistName,  // 주인공 이름 (한글)
+
+            @JsonProperty("protagonist_desc")
+            String protagonistDesc,  // 주인공 상세 설정 (성격, 사상 등)
+
+            @JsonProperty("synopsis")
+            String synopsis,  // 초기 대규모 시놉시스 (2000자 이상)
+
+            @JsonProperty("twisted_synopsis")
+            String twistedSynopsis  // 변주된 대규모 시놉시스 (2000자 이상)
+
     ) {}
 
-    /**
-     * 세계관 생성 응답
-     */
-    public record CreateUniverseResponse(
-            String id,
-            String name,
-            String description,
-            @JsonProperty("detailed_description") String detailedDescription,
-            String story,
-            String canon,
-            @JsonProperty("representative_image") String representativeImage,
-            @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
-            @JsonProperty("created_at") LocalDateTime createdAt,
-            @JsonProperty("updated_at") LocalDateTime updatedAt
-    ) {}
 
     /**
      * 세계관 수정 요청
@@ -60,6 +62,12 @@ public class UniverseDto {
             @Size(max = 255, message = "이름은 255자를 초과할 수 없습니다")
             String name,
 
+            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
+            String story,
+
+            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
+            String canon,
+
             @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
             String description,
 
@@ -67,49 +75,53 @@ public class UniverseDto {
             @Size(max = 5000, message = "상세 설명은 5000자를 초과할 수 없습니다")
             String detailedDescription,
 
-            @Size(max = 2000, message = "스토리는 2000자를 초과할 수 없습니다")
-            String story,
-
-            @Size(max = 2000, message = "정전은 2000자를 초과할 수 없습니다")
-            String canon,
+            @JsonProperty("estimated_play_time")
+            Integer estimatedPlayTime,
 
             @JsonProperty("representative_image")
             String representativeImage,
 
-            @JsonProperty("estimated_play_time")
-            Integer estimatedPlayTime
+            @JsonProperty("setting")
+            String setting,  // 세계관 설정 전체 텍스트
+
+            @JsonProperty("protagonist_name")
+            String protagonistName,  // 주인공 이름 (한글)
+
+            @JsonProperty("protagonist_desc")
+            String protagonistDesc,  // 주인공 상세 설정 (성격, 사상 등)
+
+            @JsonProperty("synopsis")
+            String synopsis,  // 초기 대규모 시놉시스 (2000자 이상)
+
+            @JsonProperty("twisted_synopsis")
+            String twistedSynopsis  // 변주된 대규모 시놉시스 (2000자 이상)
+
     ) {}
 
     /**
      * 세계관 목록 응답
      */
     public record UniverseListResponse(
-            List<UniverseSummary> universes
+            List<UniverseResponse> universes
     ) {}
 
     /**
-     * 세계관 요약 정보
+     * 세계관 정보
      */
-    public record UniverseSummary(
+    public record UniverseResponse(
             String id,
             String name,
-            String description,
-            @JsonProperty("representative_image") String representativeImage,
-            @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
-            @JsonProperty("created_at") LocalDateTime createdAt,
-            @JsonProperty("updated_at") LocalDateTime updatedAt
-    ) {}
-
-    /**
-     * 세계관 상세 정보
-     */
-    public record UniverseDetailResponse(
-            String id,
-            String name,
+            String story,
+            String canon,
             String description,
             @JsonProperty("detailed_description") String detailedDescription,
-            @JsonProperty("representative_image") String representativeImage,
             @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
+            @JsonProperty("representative_image") String representativeImage,
+            String setting,
+            @JsonProperty("protagonist_name") String protagonistName,
+            @JsonProperty("protagonist_desc") String protagonistDesc,
+            String synopsis,
+            @JsonProperty("twisted_synopsis") String twistedSynopsis,
             @JsonProperty("created_at") LocalDateTime createdAt,
             @JsonProperty("updated_at") LocalDateTime updatedAt
     ) {}

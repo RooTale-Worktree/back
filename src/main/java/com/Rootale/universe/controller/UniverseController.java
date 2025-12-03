@@ -57,7 +57,7 @@ public class UniverseController {
             @ApiResponse(responseCode = "404", description = "세계관을 찾을 수 없음",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<UniverseDto.UniverseDetailResponse> getUniverseById(
+    public ResponseEntity<UniverseDto.UniverseResponse> getUniverseById(
             @PathVariable("universe_id") String universeId,
             Authentication authentication) {
 
@@ -65,7 +65,7 @@ public class UniverseController {
             return ResponseEntity.status(401).build();
         }
 
-        UniverseDto.UniverseDetailResponse response = universeService.getUniverseById(universeId);
+        UniverseDto.UniverseResponse response = universeService.getUniverseById(universeId);
         return ResponseEntity.ok(response);
     }
 
@@ -99,7 +99,7 @@ public class UniverseController {
             @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자",
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class)))
     })
-    public ResponseEntity<UniverseDto.CreateUniverseResponse> createUniverse(
+    public ResponseEntity<UniverseDto.UniverseResponse> createUniverse(
             @Valid @RequestBody UniverseDto.CreateUniverseRequest request,
             Authentication authentication) {
 
@@ -107,7 +107,7 @@ public class UniverseController {
             return ResponseEntity.status(401).build();
         }
 
-        UniverseDto.CreateUniverseResponse response = universeService.createUniverse(request);
+        UniverseDto.UniverseResponse response = universeService.createUniverse(request);
         return ResponseEntity.ok(response);
     }
 
@@ -118,7 +118,7 @@ public class UniverseController {
             @ApiResponse(responseCode = "401", description = "인증되지 않은 사용자"),
             @ApiResponse(responseCode = "404", description = "세계관을 찾을 수 없음")
     })
-    public ResponseEntity<UniverseDto.UniverseDetailResponse> updateUniverse(
+    public ResponseEntity<UniverseDto.UniverseResponse> updateUniverse(
             @PathVariable("universe_id") String universeId,
             @Valid @RequestBody UniverseDto.UpdateUniverseRequest request,
             Authentication authentication) {
@@ -127,7 +127,7 @@ public class UniverseController {
             return ResponseEntity.status(401).build();
         }
 
-        UniverseDto.UniverseDetailResponse response = universeService.updateUniverse(universeId, request);
+        UniverseDto.UniverseResponse response = universeService.updateUniverse(universeId, request);
         return ResponseEntity.ok(response);
     }
 }

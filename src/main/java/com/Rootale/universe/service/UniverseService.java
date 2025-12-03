@@ -38,8 +38,8 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             List<Universe> universes = universeCustomRepository.findAllUniverses();  // ⭐ 변경
             log.info("✅ Found {} universes", universes.size());
 
-            List<UniverseDto.UniverseSummary> summaries = universes.stream()
-                    .map(this::toUniverseSummary)
+            List<UniverseDto.UniverseResponse> summaries = universes.stream()
+                    .map(this::toUniverse)
                     .collect(Collectors.toList());
 
             return new UniverseDto.UniverseListResponse(summaries);
@@ -52,14 +52,14 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     /**
      * 특정 세계관 상세 조회
      */
-    public UniverseDto.UniverseDetailResponse getUniverseById(String universeId) {
+    public UniverseDto.UniverseResponse getUniverseById(String universeId) {
         try {
             log.info("📋 Fetching universe: {}", universeId);
             Universe universe = universeCustomRepository.findByUniverseId(universeId)  // ⭐ 변경
                     .orElseThrow(() -> new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId));
 
             log.info("✅ Found universe: {}", universe.getName());
-            return toUniverseDetail(universe);
+            return toUniverse(universe);
         } catch (Exception e) {
             log.error("❌ Failed to fetch universe {}: {}", universeId, e.getMessage(), e);
             throw e;
@@ -95,7 +95,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     /**
      * 새로운 세계관 생성
      */
-    public UniverseDto.CreateUniverseResponse createUniverse(UniverseDto.CreateUniverseRequest request) {
+    public UniverseDto.UniverseResponse createUniverse(UniverseDto.CreateUniverseRequest request) {
         try {
             log.info("🆕 Creating new universe: {}", request.name());
 
@@ -115,7 +115,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             Universe savedUniverse = universeRepository.save(universe);
             log.info("✅ Universe created successfully with ID: {}", savedUniverse.getUniverseId());
 
-            return toCreateUniverseResponse(savedUniverse);
+            return toUniverse(savedUniverse);
         } catch (Exception e) {
             log.error("❌ Failed to create universe: {}", e.getMessage(), e);
             throw new RuntimeException("세계관 생성 실패: " + e.getMessage(), e);
@@ -125,7 +125,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     /**
      * 세계관 수정
      */
-    public UniverseDto.UniverseDetailResponse updateUniverse(
+    public UniverseDto.UniverseResponse updateUniverse(
             String universeId,
             UniverseDto.UpdateUniverseRequest request) {
         try {
@@ -161,7 +161,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             Universe updatedUniverse = universeRepository.save(universe);
 
             log.info("✅ Universe updated successfully: {}", universeId);
-            return toUniverseDetail(updatedUniverse);
+            return toUniverse(updatedUniverse);
 
         } catch (Exception e) {
             log.error("❌ Failed to update universe {}: {}", universeId, e.getMessage(), e);
@@ -171,26 +171,21 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
 
     // ===== Mapper methods =====
 
-    private UniverseDto.UniverseSummary toUniverseSummary(Universe universe) {
-        return new UniverseDto.UniverseSummary(
+    private UniverseDto.UniverseResponse toUniverse(Universe universe) {
+        return new UniverseDto.UniverseResponse(
                 universe.getUniverseId(),
                 universe.getName(),
-                universe.getDescription(),
-                generatePresignedUrl(universe.getRepresentativeImage()),
-                universe.getEstimatedPlayTime(),
-                universe.getCreatedAt(),
-                universe.getUpdatedAt()
-        );
-    }
-
-    private UniverseDto.UniverseDetailResponse toUniverseDetail(Universe universe) {
-        return new UniverseDto.UniverseDetailResponse(
-                universe.getUniverseId(),
-                universe.getName(),
+                universe.getStory(),
+                universe.getCanon(),
                 universe.getDescription(),
                 universe.getDetailedDescription(),
-                generatePresignedUrl(universe.getRepresentativeImage()),
                 universe.getEstimatedPlayTime(),
+                generatePresignedUrl(universe.getRepresentativeImage()),
+                universe.getSetting(),
+                universe.getProtagonistName(),
+                universe.getProtagonistDesc(),
+                universe.getSynopsis(),
+                universe.getTwistedSynopsis(),
                 universe.getCreatedAt(),
                 universe.getUpdatedAt()
         );
@@ -209,16 +204,21 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
         );
     }
 
-    private UniverseDto.CreateUniverseResponse toCreateUniverseResponse(Universe universe) {
-        return new UniverseDto.CreateUniverseResponse(
+    private UniverseDto.UniverseResponse toCreateUniverseResponse(Universe universe) {
+        return new UniverseDto.UniverseResponse(
                 universe.getUniverseId(),
                 universe.getName(),
-                universe.getDescription(),
-                universe.getDetailedDescription(),
                 universe.getStory(),
                 universe.getCanon(),
-                generatePresignedUrl(universe.getRepresentativeImage()),
+                universe.getDescription(),
+                universe.getDetailedDescription(),
                 universe.getEstimatedPlayTime(),
+                generatePresignedUrl(universe.getRepresentativeImage()),
+                universe.getSetting(),
+                universe.getProtagonistName(),
+                universe.getProtagonistDesc(),
+                universe.getSynopsis(),
+                universe.getTwistedSynopsis(),
                 universe.getCreatedAt(),
                 universe.getUpdatedAt()
         );
