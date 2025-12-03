@@ -76,6 +76,13 @@ public class UniverseCustomRepository {
                         .representativeImage(getStringValue(node, "representative_image"))
                         .createdAt(getDateTimeValue(node, "created_at"))
                         .updatedAt(getDateTimeValue(node, "updated_at"))
+                        .setting(getStringValue(node, "setting"))
+                        .protagonistName(getStringValue(node, "protagonist_name"))
+                        .protagonistDesc(getStringValue(node, "protagonist_desc"))
+                        .synopsis(getStringValue(node, "synopsis"))
+                        .twistedSynopsis(getStringValue(node, "twisted_synopsis"))
+                        .createdAt(getDateTimeValue(node, "created_at"))
+                        .updatedAt(getDateTimeValue(node, "updated_at"))
                         .build();
 
                 return Optional.of(universe);

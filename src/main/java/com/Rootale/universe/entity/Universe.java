@@ -42,6 +42,21 @@ public class Universe {
     @Property("representative_image")
     private String representativeImage;
 
+    @Property("setting")
+    private String setting;  // 세계관 설정 전체 텍스트
+
+    @Property("protagonist_name")
+    private String protagonistName;  // 주인공 이름 (한글)
+
+    @Property("protagonist_desc")
+    private String protagonistDesc;  // 주인공 상세 설정 (성격, 사상 등)
+
+    @Property("synopsis")
+    private String synopsis;  // 초기 대규모 시놉시스 (2000자 이상)
+
+    @Property("twisted_synopsis")
+    private String twistedSynopsis;  // 변주된 대규모 시놉시스 (2000자 이상)
+
     @Property("created_at")
     private LocalDateTime createdAt;
 
