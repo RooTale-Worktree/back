@@ -1,8 +1,8 @@
+
 package com.Rootale.universe.entity;
 
 import lombok.*;
 import org.springframework.data.neo4j.core.schema.*;
-import org.springframework.data.neo4j.core.support.UUIDStringGenerator;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -17,28 +17,29 @@ import java.util.List;
 public class Scene {
 
     @Id
-    @GeneratedValue(generatorClass = UUIDStringGenerator.class)
+    @Property("node_id")
     private String nodeId;
 
-    @Property("universe_id")
-    private String universeId;
+    @Property("title")
+    private String title;
 
-    @Property("depth")
-    private Integer depth;
+    @Property("description")
+    private String description;
 
-    @Property("story_text")
-    private String storyText;
+    @Property("setting")
+    private String setting;
 
-    @Property("critique_score")
-    private Integer critiqueScore;
+    @Property("phase")
+    private String phase;
 
-    @Property("protagonist_state")
-    private String protagonistState;
+    @Property("characters")
+    private String characters;
 
-    @Property("choice_text")
-    @Builder.Default
-    private List<String> choiceText = new ArrayList<>();
+    @Property("character_state")
+    private String characterState;
 
+    @Property("purpose")
+    private String purpose;
 
     @Property("created_at")
     private LocalDateTime createdAt;
@@ -50,4 +51,7 @@ public class Scene {
     @Builder.Default
     private List<ChoiceRelationship> choices = new ArrayList<>();
 
+    @Relationship(type = "PREREQUISITION", direction = Relationship.Direction.OUTGOING)
+    @Builder.Default
+    private List<PrerequisitionRelationship> prerequisitions = new ArrayList<>();
 }
