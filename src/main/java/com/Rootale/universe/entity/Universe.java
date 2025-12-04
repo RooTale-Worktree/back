@@ -33,8 +33,8 @@ public class Universe {
     @Property("description")
     private String description;
 
-    @Property("detailed_description")
-    private String detailedDescription;
+    @Property("detail_description")
+    private String detailDescription;
 
     @Property("estimated_play_time")
     private Integer estimatedPlayTime;
@@ -62,6 +62,7 @@ public class Universe {
 
     @Property("updated_at")
     private LocalDateTime updatedAt;
+
 
 //    @Relationship(type = "HAS_START", direction = Relationship.Direction.OUTGOING)
 //    private Scene startScene;

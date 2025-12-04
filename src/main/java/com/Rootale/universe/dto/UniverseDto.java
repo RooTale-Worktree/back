@@ -27,9 +27,9 @@ public class UniverseDto {
             @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
             String description,
 
-            @JsonProperty("detailed_description")
+            @JsonProperty("detail_description")
             @Size(max = 5000, message = "상세 설명은 5000자를 초과할 수 없습니다")
-            String detailedDescription,
+            String detailDescription,
 
             @JsonProperty("estimated_play_time")
             Integer estimatedPlayTime,
@@ -71,9 +71,9 @@ public class UniverseDto {
             @Size(max = 1000, message = "설명은 1000자를 초과할 수 없습니다")
             String description,
 
-            @JsonProperty("detailed_description")
+            @JsonProperty("detail_description")
             @Size(max = 5000, message = "상세 설명은 5000자를 초과할 수 없습니다")
-            String detailedDescription,
+            String detailDescription,
 
             @JsonProperty("estimated_play_time")
             Integer estimatedPlayTime,
@@ -114,7 +114,7 @@ public class UniverseDto {
             String story,
             String canon,
             String description,
-            @JsonProperty("detailed_description") String detailedDescription,
+            @JsonProperty("detail_description") String detailDescription,
             @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
             @JsonProperty("representative_image") String representativeImage,
             String setting,
@@ -122,6 +122,7 @@ public class UniverseDto {
             @JsonProperty("protagonist_desc") String protagonistDesc,
             String synopsis,
             @JsonProperty("twisted_synopsis") String twistedSynopsis,
+            @JsonProperty("start_node_id") String startNodeId,
             @JsonProperty("created_at") LocalDateTime createdAt,
             @JsonProperty("updated_at") LocalDateTime updatedAt
     ) {}
