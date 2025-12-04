@@ -40,8 +40,8 @@ public class UniverseService {
                     universeCustomRepository.findAllUniversesWithStartNode();
             log.info("✅ Found {} universes", universesWithStart.size());
 
-            List<UniverseDto.UniverseResponse> responses = universesWithStart.stream()
-                    .map(uws -> toUniverseResponse(uws.universe(), uws.startNodeId()))
+            List<UniverseDto.UniverseResponseSimple> responses = universesWithStart.stream()
+                    .map(uws -> toUniverseResponseSimple(uws.universe(), uws.startNodeId()))
                     .collect(Collectors.toList());
 
             return new UniverseDto.UniverseListResponse(responses);
@@ -62,6 +62,20 @@ public class UniverseService {
 
             log.info("✅ Found universe: {}", universeWithStart.universe().getName());
             return toUniverseResponse(universeWithStart.universe(), universeWithStart.startNodeId());
+        } catch (Exception e) {
+            log.error("❌ Failed to fetch universe {}: {}", universeId, e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    public UniverseDto.UniverseResponseSimple getUniverseByIdSimple(String universeId) {
+        try {
+            log.info("📋 Fetching universe: {}", universeId);
+            var universeWithStart = universeCustomRepository.findByUniverseIdWithStartNode(universeId)
+                    .orElseThrow(() -> new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId));
+
+            log.info("✅ Found universe: {}", universeWithStart.universe().getName());
+            return toUniverseResponseSimple(universeWithStart.universe(), universeWithStart.startNodeId());
         } catch (Exception e) {
             log.error("❌ Failed to fetch universe {}: {}", universeId, e.getMessage(), e);
             throw e;
@@ -215,6 +229,21 @@ public class UniverseService {
                 universe.getSynopsis(),
                 universe.getTwistedSynopsis(),
                 startNodeId,
+                universe.getCreatedAt(),
+                universe.getUpdatedAt()
+        );
+    }
+
+    private UniverseDto.UniverseResponseSimple toUniverseResponseSimple(Universe universe, String startNodeId) {
+        return new UniverseDto.UniverseResponseSimple(
+                universe.getUniverseId(),
+                universe.getName(),
+                universe.getStory(),
+                universe.getCanon(),
+                universe.getDescription(),
+                universe.getDetailDescription(),
+                universe.getEstimatedPlayTime(),
+                generatePresignedUrl(universe.getRepresentativeImage()),
                 universe.getCreatedAt(),
                 universe.getUpdatedAt()
         );

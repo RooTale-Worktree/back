@@ -102,7 +102,7 @@ public class UniverseDto {
      * 세계관 목록 응답
      */
     public record UniverseListResponse(
-            List<UniverseResponse> universes
+            List<UniverseResponseSimple> universes
     ) {}
 
     /**
@@ -123,6 +123,19 @@ public class UniverseDto {
             String synopsis,
             @JsonProperty("twisted_synopsis") String twistedSynopsis,
             @JsonProperty("start_node_id") String startNodeId,
+            @JsonProperty("created_at") LocalDateTime createdAt,
+            @JsonProperty("updated_at") LocalDateTime updatedAt
+    ) {}
+
+    public record UniverseResponseSimple(
+            String id,
+            String name,
+            String story,
+            String canon,
+            String description,
+            @JsonProperty("detail_description") String detailDescription,
+            @JsonProperty("estimated_play_time") Integer estimatedPlayTime,
+            @JsonProperty("representative_image") String representativeImage,
             @JsonProperty("created_at") LocalDateTime createdAt,
             @JsonProperty("updated_at") LocalDateTime updatedAt
     ) {}
