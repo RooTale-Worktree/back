@@ -1,3 +1,4 @@
+
 package com.Rootale.universe.service;
 
 import com.Rootale.s3.S3FileService;
@@ -13,15 +14,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.net.URL;
-import java.time.*;
-import java.util.*;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
-//@Transactional(readOnly=true)
-public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
+public class UniverseService {
 
     private final UniverseRepository universeRepository;
     private final UniverseCustomRepository universeCustomRepository;
@@ -35,14 +36,15 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     public UniverseDto.UniverseListResponse getAllUniverses() {
         try {
             log.info("📋 Fetching all universes");
-            List<Universe> universes = universeCustomRepository.findAllUniverses();  // ⭐ 변경
-            log.info("✅ Found {} universes", universes.size());
+            List<UniverseCustomRepository.UniverseWithStartNode> universesWithStart =
+                    universeCustomRepository.findAllUniversesWithStartNode();
+            log.info("✅ Found {} universes", universesWithStart.size());
 
-            List<UniverseDto.UniverseResponse> summaries = universes.stream()
-                    .map(this::toUniverse)
+            List<UniverseDto.UniverseResponse> responses = universesWithStart.stream()
+                    .map(uws -> toUniverseResponse(uws.universe(), uws.startNodeId()))
                     .collect(Collectors.toList());
 
-            return new UniverseDto.UniverseListResponse(summaries);
+            return new UniverseDto.UniverseListResponse(responses);
         } catch (Exception e) {
             log.error("❌ Failed to fetch universes: {}", e.getMessage(), e);
             throw new RuntimeException("세계관 목록 조회 실패: " + e.getMessage(), e);
@@ -55,11 +57,11 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     public UniverseDto.UniverseResponse getUniverseById(String universeId) {
         try {
             log.info("📋 Fetching universe: {}", universeId);
-            Universe universe = universeCustomRepository.findByUniverseId(universeId)  // ⭐ 변경
+            var universeWithStart = universeCustomRepository.findByUniverseIdWithStartNode(universeId)
                     .orElseThrow(() -> new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId));
 
-            log.info("✅ Found universe: {}", universe.getName());
-            return toUniverse(universe);
+            log.info("✅ Found universe: {}", universeWithStart.universe().getName());
+            return toUniverseResponse(universeWithStart.universe(), universeWithStart.startNodeId());
         } catch (Exception e) {
             log.error("❌ Failed to fetch universe {}: {}", universeId, e.getMessage(), e);
             throw e;
@@ -73,8 +75,8 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
         try {
             log.info("📋 Fetching characters for universe: {}", universeId);
 
-            // ⭐ 존재 확인도 커스텀 메서드 사용
-            if (universeCustomRepository.findByUniverseId(universeId).isEmpty()) {
+            // 존재 확인
+            if (universeCustomRepository.findByUniverseIdWithStartNode(universeId).isEmpty()) {
                 throw new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId);
             }
 
@@ -103,11 +105,16 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             Universe universe = Universe.builder()
                     .name(request.name())
                     .description(request.description())
-                    .detailedDescription(request.detailedDescription())  // ⭐ 추가
+                    .detailDescription(request.detailDescription())
                     .story(request.story())
                     .canon(request.canon())
                     .representativeImage(request.representativeImage())
                     .estimatedPlayTime(request.estimatedPlayTime())
+                    .setting(request.setting())
+                    .protagonistName(request.protagonistName())
+                    .protagonistDesc(request.protagonistDesc())
+                    .synopsis(request.synopsis())
+                    .twistedSynopsis(request.twistedSynopsis())
                     .createdAt(now)
                     .updatedAt(now)
                     .build();
@@ -115,7 +122,11 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             Universe savedUniverse = universeRepository.save(universe);
             log.info("✅ Universe created successfully with ID: {}", savedUniverse.getUniverseId());
 
-            return toUniverse(savedUniverse);
+            // 저장 후 start_node_id 조회를 위해 다시 조회
+            var universeWithStart = universeCustomRepository.findByUniverseIdWithStartNode(savedUniverse.getUniverseId())
+                    .orElse(new UniverseCustomRepository.UniverseWithStartNode(savedUniverse, null));
+
+            return toUniverseResponse(universeWithStart.universe(), universeWithStart.startNodeId());
         } catch (Exception e) {
             log.error("❌ Failed to create universe: {}", e.getMessage(), e);
             throw new RuntimeException("세계관 생성 실패: " + e.getMessage(), e);
@@ -125,14 +136,14 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
     /**
      * 세계관 수정
      */
-    public UniverseDto.UniverseResponse updateUniverse(
-            String universeId,
-            UniverseDto.UpdateUniverseRequest request) {
+    public UniverseDto.UniverseResponse updateUniverse(String universeId, UniverseDto.UpdateUniverseRequest request) {
         try {
             log.info("✏️ Updating universe: {}", universeId);
 
-            Universe universe = universeCustomRepository.findByUniverseId(universeId)
+            var universeWithStart = universeCustomRepository.findByUniverseIdWithStartNode(universeId)
                     .orElseThrow(() -> new UniverseNotFoundException("세계관을 찾을 수 없습니다: " + universeId));
+
+            Universe universe = universeWithStart.universe();
 
             // null이 아닌 필드만 업데이트
             if (request.name() != null) {
@@ -141,8 +152,8 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             if (request.description() != null) {
                 universe.setDescription(request.description());
             }
-            if (request.detailedDescription() != null) {
-                universe.setDetailedDescription(request.detailedDescription());
+            if (request.detailDescription() != null) {
+                universe.setDetailDescription(request.detailDescription());
             }
             if (request.story() != null) {
                 universe.setStory(request.story());
@@ -156,12 +167,29 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
             if (request.estimatedPlayTime() != null) {
                 universe.setEstimatedPlayTime(request.estimatedPlayTime());
             }
+            if (request.setting() != null) {
+                universe.setSetting(request.setting());
+            }
+            if (request.protagonistName() != null) {
+                universe.setProtagonistName(request.protagonistName());
+            }
+            if (request.protagonistDesc() != null) {
+                universe.setProtagonistDesc(request.protagonistDesc());
+            }
+            if (request.synopsis() != null) {
+                universe.setSynopsis(request.synopsis());
+            }
+            if (request.twistedSynopsis() != null) {
+                universe.setTwistedSynopsis(request.twistedSynopsis());
+            }
 
             universe.setUpdatedAt(LocalDateTime.now());
             Universe updatedUniverse = universeRepository.save(universe);
 
             log.info("✅ Universe updated successfully: {}", universeId);
-            return toUniverse(updatedUniverse);
+
+            // 업데이트 후 start_node_id 유지
+            return toUniverseResponse(updatedUniverse, universeWithStart.startNodeId());
 
         } catch (Exception e) {
             log.error("❌ Failed to update universe {}: {}", universeId, e.getMessage(), e);
@@ -171,14 +199,14 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
 
     // ===== Mapper methods =====
 
-    private UniverseDto.UniverseResponse toUniverse(Universe universe) {
+    private UniverseDto.UniverseResponse toUniverseResponse(Universe universe, String startNodeId) {
         return new UniverseDto.UniverseResponse(
                 universe.getUniverseId(),
                 universe.getName(),
                 universe.getStory(),
                 universe.getCanon(),
                 universe.getDescription(),
-                universe.getDetailedDescription(),
+                universe.getDetailDescription(),
                 universe.getEstimatedPlayTime(),
                 generatePresignedUrl(universe.getRepresentativeImage()),
                 universe.getSetting(),
@@ -186,6 +214,7 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
                 universe.getProtagonistDesc(),
                 universe.getSynopsis(),
                 universe.getTwistedSynopsis(),
+                startNodeId,
                 universe.getCreatedAt(),
                 universe.getUpdatedAt()
         );
@@ -202,33 +231,6 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
                         ? String.join(", ", character.getPersonality())
                         : ""
         );
-    }
-
-    private UniverseDto.UniverseResponse toCreateUniverseResponse(Universe universe) {
-        return new UniverseDto.UniverseResponse(
-                universe.getUniverseId(),
-                universe.getName(),
-                universe.getStory(),
-                universe.getCanon(),
-                universe.getDescription(),
-                universe.getDetailedDescription(),
-                universe.getEstimatedPlayTime(),
-                generatePresignedUrl(universe.getRepresentativeImage()),
-                universe.getSetting(),
-                universe.getProtagonistName(),
-                universe.getProtagonistDesc(),
-                universe.getSynopsis(),
-                universe.getTwistedSynopsis(),
-                universe.getCreatedAt(),
-                universe.getUpdatedAt()
-        );
-    }
-
-    // Custom Exception
-    public static class UniverseNotFoundException extends RuntimeException {
-        public UniverseNotFoundException(String message) {
-            super(message);
-        }
     }
 
     /**
@@ -253,6 +255,13 @@ public class UniverseService {  // ⭐ @Transactional(readOnly = true) 제거
         } catch (Exception e) {
             log.warn("⚠️ Failed to generate presigned URL for key: {}", s3Key, e);
             return null;
+        }
+    }
+
+    // Custom Exception
+    public static class UniverseNotFoundException extends RuntimeException {
+        public UniverseNotFoundException(String message) {
+            super(message);
         }
     }
 }

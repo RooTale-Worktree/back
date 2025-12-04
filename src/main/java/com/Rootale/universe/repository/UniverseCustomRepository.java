@@ -21,87 +21,158 @@ public class UniverseCustomRepository {
 
     private final Driver neo4jDriver;
 
-    public List<Universe> findAllUniverses() {
-        List<Universe> universes = new ArrayList<>();
+    /**
+     * 모든 Universe와 시작 Scene node_id 조회
+     */
+    public List<UniverseWithStartNode> findAllUniversesWithStartNode() {
+        List<UniverseWithStartNode> results = new ArrayList<>();
 
         try (Session session = neo4jDriver.session()) {
-            Result result = session.run("MATCH (u:Universe) RETURN u");
+            String query = """
+                    MATCH (u:Universe)
+                    OPTIONAL MATCH (u)-[:HAS_START]->(start:Scene)
+                    RETURN u, start.node_id AS start_node_id
+                    ORDER BY u.created_at DESC
+                    """;
+
+            log.debug("🔍 Executing query: {}", query);
+            Result result = session.run(query);
 
             while (result.hasNext()) {
                 Record record = result.next();
-                var node = record.get("u").asNode();
 
-                Universe universe = Universe.builder()
-                        .universeId(getStringValue(node, "universe_id"))
-                        .name(getStringValue(node, "name"))
-                        .story(getStringValue(node, "story"))
-                        .canon(getStringValue(node, "canon"))
-                        .description(getStringValue(node, "description"))
-                        .estimatedPlayTime(getIntValue(node, "estimated_play_time"))
-                        .representativeImage(getStringValue(node, "representative_image"))
-                        .createdAt(getDateTimeValue(node, "created_at"))
-                        .updatedAt(getDateTimeValue(node, "updated_at"))
-                        .build();
+                try {
+                    var universeNode = record.get("u").asNode();
+                    var startNodeIdValue = record.get("start_node_id");
+                    String startNodeId = startNodeIdValue.isNull() ? null : startNodeIdValue.asString();
 
-                universes.add(universe);
+                    Universe universe = mapNodeToUniverse(universeNode);
+                    results.add(new UniverseWithStartNode(universe, startNodeId));
+
+                    log.debug("✅ Mapped universe: id={}, name={}, startNodeId={}",
+                            universe.getUniverseId(), universe.getName(), startNodeId);
+                } catch (Exception e) {
+                    log.error("❌ Error mapping universe record: {}", e.getMessage(), e);
+                }
             }
 
-            log.info("✅ Successfully fetched {} universes", universes.size());
+            log.info("✅ Successfully fetched {} universes with start nodes", results.size());
+
         } catch (Exception e) {
             log.error("❌ Error fetching universes: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to fetch universes from Neo4j", e);
         }
 
-        return universes;
+        return results;
     }
 
-    public Optional<Universe> findByUniverseId(String universeId) {
+    /**
+     * 특정 Universe와 시작 Scene node_id 조회
+     */
+    public Optional<UniverseWithStartNode> findByUniverseIdWithStartNode(String universeId) {
         try (Session session = neo4jDriver.session()) {
+            String query = """
+                    MATCH (u:Universe {universe_id: $universeId})
+                    OPTIONAL MATCH (u)-[:HAS_START]->(start:Scene)
+                    RETURN u, start.node_id AS start_node_id
+                    """;
+
+            log.debug("🔍 Executing query for universeId: {}", universeId);
+
             Result result = session.run(
-                    "MATCH (u:Universe {universe_id: $universeId}) RETURN u",
+                    query,
                     org.neo4j.driver.Values.parameters("universeId", universeId)
             );
 
             if (result.hasNext()) {
                 Record record = result.next();
-                var node = record.get("u").asNode();
 
-                Universe universe = Universe.builder()
-                        .universeId(getStringValue(node, "universe_id"))
-                        .name(getStringValue(node, "name"))
-                        .story(getStringValue(node, "story"))
-                        .canon(getStringValue(node, "canon"))
-                        .description(getStringValue(node, "description"))
-                        .estimatedPlayTime(getIntValue(node, "estimated_play_time"))
-                        .representativeImage(getStringValue(node, "representative_image"))
-                        .createdAt(getDateTimeValue(node, "created_at"))
-                        .updatedAt(getDateTimeValue(node, "updated_at"))
-                        .setting(getStringValue(node, "setting"))
-                        .protagonistName(getStringValue(node, "protagonist_name"))
-                        .protagonistDesc(getStringValue(node, "protagonist_desc"))
-                        .synopsis(getStringValue(node, "synopsis"))
-                        .twistedSynopsis(getStringValue(node, "twisted_synopsis"))
-                        .createdAt(getDateTimeValue(node, "created_at"))
-                        .updatedAt(getDateTimeValue(node, "updated_at"))
-                        .build();
+                var universeNode = record.get("u").asNode();
+                var startNodeIdValue = record.get("start_node_id");
+                String startNodeId = startNodeIdValue.isNull() ? null : startNodeIdValue.asString();
 
-                return Optional.of(universe);
+                Universe universe = mapNodeToUniverse(universeNode);
+
+                log.info("✅ Found universe: id={}, name={}, startNodeId={}",
+                        universe.getUniverseId(), universe.getName(), startNodeId);
+
+                return Optional.of(new UniverseWithStartNode(universe, startNodeId));
             }
 
+            log.warn("⚠️ Universe not found: {}", universeId);
             return Optional.empty();
+
         } catch (Exception e) {
             log.error("❌ Error fetching universe {}: {}", universeId, e.getMessage(), e);
             throw new RuntimeException("Failed to fetch universe from Neo4j", e);
         }
     }
 
-    // Helper methods
+    public Optional<Universe> findByUniverseId(String universeId) {
+        try (Session session = neo4jDriver.session()) {
+            String query = """
+                    MATCH (u:Universe {universe_id: $universeId})
+                    RETURN u
+                    """;
+
+            log.debug("🔍 Executing simple query for universeId: {}", universeId);
+
+            Result result = session.run(
+                    query,
+                    org.neo4j.driver.Values.parameters("universeId", universeId)
+            );
+
+            if (result.hasNext()) {
+                Record record = result.next();
+                var universeNode = record.get("u").asNode();
+                Universe universe = mapNodeToUniverse(universeNode);
+
+                log.info("✅ Found universe: id={}, name={}",
+                        universe.getUniverseId(), universe.getName());
+
+                return Optional.of(universe);
+            }
+
+            log.warn("⚠️ Universe not found: {}", universeId);
+            return Optional.empty();
+
+        } catch (Exception e) {
+            log.error("❌ Error fetching universe {}: {}", universeId, e.getMessage(), e);
+            throw new RuntimeException("Failed to fetch universe from Neo4j", e);
+        }
+    }
+
+    /**
+     * Node를 Universe 엔티티로 매핑
+     */
+    private Universe mapNodeToUniverse(org.neo4j.driver.types.Node node) {
+        return Universe.builder()
+                .universeId(getStringValue(node, "universe_id"))
+                .name(getStringValue(node, "name"))
+                .story(getStringValue(node, "story"))
+                .canon(getStringValue(node, "canon"))
+                .description(getStringValue(node, "description"))
+                .detailDescription(getStringValue(node, "detail_description"))
+                .estimatedPlayTime(getIntValue(node, "estimated_play_time"))
+                .representativeImage(getStringValue(node, "representative_image"))
+                .setting(getStringValue(node, "setting"))
+                .protagonistName(getStringValue(node, "protagonist_name"))
+                .protagonistDesc(getStringValue(node, "protagonist_desc"))
+                .synopsis(getStringValue(node, "synopsis"))
+                .twistedSynopsis(getStringValue(node, "twisted_synopsis"))
+                .createdAt(getDateTimeValue(node, "created_at"))
+                .updatedAt(getDateTimeValue(node, "updated_at"))
+                .build();
+    }
+
+    // ===== Helper Methods =====
+
     private String getStringValue(org.neo4j.driver.types.Node node, String key) {
         try {
             var value = node.get(key);
             return value.isNull() ? null : value.asString();
         } catch (Exception e) {
-            log.debug("Could not get string value for key: {}", key);
+            log.debug("Could not get string value for key '{}': {}", key, e.getMessage());
             return null;
         }
     }
@@ -111,7 +182,7 @@ public class UniverseCustomRepository {
             var value = node.get(key);
             return value.isNull() ? null : value.asInt();
         } catch (Exception e) {
-            log.debug("Could not get int value for key: {}", key);
+            log.debug("Could not get int value for key '{}': {}", key, e.getMessage());
             return null;
         }
     }
@@ -119,9 +190,11 @@ public class UniverseCustomRepository {
     private LocalDateTime getDateTimeValue(org.neo4j.driver.types.Node node, String key) {
         try {
             var value = node.get(key);
-            if (value.isNull()) return null;
+            if (value.isNull()) {
+                return null;
+            }
 
-            // Try LocalDateTime first
+            // Try LocalDateTime
             try {
                 return value.asLocalDateTime();
             } catch (Exception e1) {
@@ -133,14 +206,22 @@ public class UniverseCustomRepository {
                     try {
                         return LocalDateTime.parse(value.asString());
                     } catch (Exception e3) {
-                        log.debug("Could not parse datetime for key: {}", key);
+                        log.debug("Could not parse datetime for key '{}': {}", key, e3.getMessage());
                         return null;
                     }
                 }
             }
         } catch (Exception e) {
-            log.debug("Could not get datetime value for key: {}", key);
+            log.debug("Could not get datetime value for key '{}': {}", key, e.getMessage());
             return null;
         }
     }
+
+    /**
+     * Universe와 시작 노드 ID를 함께 담는 record
+     */
+    public record UniverseWithStartNode(
+            Universe universe,
+            String startNodeId
+    ) {}
 }

@@ -47,11 +47,11 @@ public class Scene {
     @Property("updated_at")
     private LocalDateTime updatedAt;
 
-    @Relationship(type = "CHOICE", direction = Relationship.Direction.OUTGOING)
-    @Builder.Default
-    private List<ChoiceRelationship> choices = new ArrayList<>();
-
-    @Relationship(type = "PREREQUISITION", direction = Relationship.Direction.OUTGOING)
-    @Builder.Default
-    private List<PrerequisitionRelationship> prerequisitions = new ArrayList<>();
+//    @Relationship(type = "CHOICE", direction = Relationship.Direction.OUTGOING)
+//    @Builder.Default
+//    private List<ChoiceRelationship> choices = new ArrayList<>();
+//
+//    @Relationship(type = "PREREQUISITION", direction = Relationship.Direction.OUTGOING)
+//    @Builder.Default
+//    private List<PrerequisitionRelationship> prerequisitions = new ArrayList<>();
 }
